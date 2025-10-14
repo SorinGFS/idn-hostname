@@ -1,0 +1,5 @@
+{
+    "description": "Bidi Rule 1 — L-branch fail: contains L but doesn't start with L",
+    "data": "1g",
+    "valid": false
+}

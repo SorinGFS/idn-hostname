@@ -1,0 +1,5 @@
+{
+    "description": "Bidi Rule 4 — fail: mixed AN and EN",
+    "data": "١2",
+    "valid": false
+}
