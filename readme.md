@@ -269,9 +269,11 @@ Each release will have its `major` and `minor` version identical with the relate
 ```
 
 :::note
+
 Far from being exhaustive, the examples are illustrative and chosen to demonstrate rule coverage. Also:
 - some of the characters are invisible,
 - some unicode codepoints that cannot be represented in `yaml` (those having `\uXXXX`) should be considered as `json`.
+
 :::
 
 **References (specs)**
@@ -284,7 +286,9 @@ Far from being exhaustive, the examples are illustrative and chosen to demonstra
 -   `UTS #46` — Unicode IDNA Compatibility Processing (mappings / deviations / transitional handling).
 
 :::info
+
 Links are intentionally not embedded here — use the RFC/UTS numbers to fetch authoritative copies on ietf.org and unicode.org.
+
 :::
 
 ## Disclaimer
