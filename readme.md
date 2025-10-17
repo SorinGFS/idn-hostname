@@ -14,6 +14,7 @@ This document explains, in plain terms, what this validator does, which RFC/UTS 
 The data source for the validator is a `json` constructed as follows:
 
 -   Baseline = Unicode `IdnaMappingTable` with allowed chars (based on props: valid/mapped/deviation/ignored/disallowed).
+-   Viramas = Unicode `DerivedCombiningClass` with `viramas`(Canonical_Combining_Class=Virama).
 -   Overlay 1 = Unicode `IdnaMappingTable` for mappings applied on top of the baseline.
 -   Overlay 2 = Unicode `DerivedJoinTypes` for join types (D,L,R,T,U) applied on top of the baseline.
 -   Overlay 3 = Unicode `DerivedBidiClass` for bidi classes (L,R,AL,NSM,EN,ES,ET,AN,CS,BN,B,S,WS,ON) applied on top of the baseline.
@@ -95,6 +96,7 @@ Each release will have its `major` and `minor` version identical with the relate
 5. **Compact four-layer data source**: the script uses a compact JSON (`idnaMappingTableCompact.json`) merged from three data sources with:
 
     - `props` — list of property names (`valid`,`mapped`,`deviation`,`ignored`,`disallowed`),
+    - `viramas` — list of `virama` codepoints (Canonical_Combining_Class=Virama),
     - `ranges` — merged contiguous ranges with a property index,
     - `mappings` — map from code point → sequence of code points (for `mapped`/`deviation`),
     - `joining_type_ranges` — merged contiguous ranges with a property index.

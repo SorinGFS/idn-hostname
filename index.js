@@ -1,7 +1,7 @@
 'use strict';
 // IDNA2008 validator using idnaMappingTableCompact.json
 const punycode = require('punycode/');
-const { props, ranges, mappings, bidi_ranges, joining_type_ranges } = require('./idnaMappingTableCompact.json');
+const { props, viramas, ranges, mappings, bidi_ranges, joining_type_ranges } = require('./idnaMappingTableCompact.json');
 // --- Error classes (short messages; RFC refs included in message) ---
 const throwIdnaContextJError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: "IdnaContextJError" }); };
 const throwIdnaContextOError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: "IdnaContextOError" }); };
@@ -18,8 +18,8 @@ const GREEK_KERAIA = 0x0375;
 const KATAKANA_MIDDLE_DOT = 0x30fb;
 const HEBREW_GERESH = 0x05f3;
 const HEBREW_GERSHAYIM = 0x05f4;
-// common Viramas (used for special ZWJ/ZWNJ acceptance)
-const VIRAMAS = new Set([0x094d, 0x09cd, 0x0a4d, 0x0acd, 0x0b4d, 0x0bcd, 0x0c4d, 0x0ccd, 0x0d4d, 0x0e3a, 0x0f82, 0x0f84, 0x1039, 0x17d2, 0x1b44, 0x1b5a, 0x1b5b, 0xa8e6]);
+// Viramas (used for special ZWJ/ZWNJ acceptance)
+const VIRAMAS = new Set(viramas);
 // binary range lookup
 function getRange(range, key) {
     if (!Array.isArray(range) || range.length === 0) return null;
