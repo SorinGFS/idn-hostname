@@ -104,7 +104,7 @@ function isIdnHostname(hostname) {
         // hyphen rules (the other one is covered by bidi)
         if (label.indexOf('--') === 2) throwIdnaSyntaxError('Label cannot contain consecutive hyphen-minus in the 3rd and 4th positions (RFC 5891 §4.2.3.1).');
         // leading combining marks check (some are not covered by bidi)
-        if (/^\p{M}$/u.test(label.charAt(0))) throwIdnaSyntaxError(`Label cannot begin with combining/enclosing mark ${cpHex(label.codePointAt(0))} (RFC 5891 §4.2.3.2).`);
+        if (/^\p{M}$/u.test(String.fromCodePoint(label.codePointAt(0)))) throwIdnaSyntaxError(`Label cannot begin with combining/enclosing mark ${cpHex(label.codePointAt(0))} (RFC 5891 §4.2.3.2).`);
         // spread cps for context and bidi checks
         const cps = Array.from(label).map((char) => char.codePointAt(0));
         let joinTypes = '';
