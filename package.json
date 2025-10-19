@@ -1,6 +1,6 @@
 {
   "name": "idn-hostname",
-  "version": "15.1.2",
+  "version": "15.1.3",
   "description": "An internationalized hostname validator as defined by RFC5890, RFC5891, RFC5892, RFC5893, RFC3492 and UTS#46",
   "keywords": [
     "idn-hostname",
