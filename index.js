@@ -60,13 +60,6 @@ function uts46map(label) {
 function cpHex(cp) {
     return `char '${String.fromCodePoint(cp)}' ` + JSON.stringify('(U+' + cp.toString(16).toUpperCase().padStart(4, '0') + ')');
 }
-// digits: Arabic-Indic sets distinction (1 and 2), ASCII→0
-function digitSet(cp) {
-    if (cp >= 0x30 && cp <= 0x39) return 0; // ASCII → EN (0)
-    if (cp >= 0x0660 && cp <= 0x0669) return 1; // Arabic-Indic
-    if (cp >= 0x06f0 && cp <= 0x06f9) return 2; // Extended Arabic-Indic
-    return 0;
-}
 // main validator
 function isIdnHostname(hostname) {
     // basic hostname checks
@@ -102,13 +95,14 @@ function isIdnHostname(hostname) {
         if (aceLabel.length > 63) throwIdnaLengthError('Final ASCII Compatible Encoding (ACE) label cannot exceed 63 bytes (RFC 5890 §2.3.2.1).');
         aceHostnameLength += aceLabel.length + 1;
         // hyphen rules (the other one is covered by bidi)
+        if (/^-|-$/.test(label)) throwIdnaSyntaxError('Label cannot begin or end with hyphen-minus (RFC 5891 §4.2.3.1).');
         if (label.indexOf('--') === 2) throwIdnaSyntaxError('Label cannot contain consecutive hyphen-minus in the 3rd and 4th positions (RFC 5891 §4.2.3.1).');
         // leading combining marks check (some are not covered by bidi)
         if (/^\p{M}$/u.test(String.fromCodePoint(label.codePointAt(0)))) throwIdnaSyntaxError(`Label cannot begin with combining/enclosing mark ${cpHex(label.codePointAt(0))} (RFC 5891 §4.2.3.2).`);
         // spread cps for context and bidi checks
         const cps = Array.from(label).map((char) => char.codePointAt(0));
         let joinTypes = '';
-        let digitSeen = 0;
+        let digits = '';
         let bidiClasses = [];
         // per-codepoint contextual checks
         for (let j = 0; j < cps.length; j++) {
@@ -143,14 +137,11 @@ function isIdnHostname(hostname) {
                 }
             }
             // check mixed digit sets
-            const ds = digitSet(cp);
-            if (ds) {
-                if (digitSeen && digitSeen !== ds) throwIdnaContextOError('Mixed digit sets in hostname not allowed (RFC 5892 Appendix A.8/A.9).');
-                digitSeen = ds;
-            }
+            if ((cp >= 0x0660 && cp <= 0x0669) || (cp >= 0x06f0 && cp <= 0x06f9)) digits += (cp < 0x06f0 ? 'a' : 'e' );
+            if (j === cps.length - 1 && /^(?=.*a)(?=.*e).*$/.test(digits)) throwIdnaContextOError('Arabic-Indic digits cannot be mixed with Extended Arabic-Indic digits (RFC 5892 Appendix A.8/A.9).');
             // validate bidi
             bidiClasses.push(getRange(bidi_ranges, cp));
-            if (j === cps.length - 1) {
+            if (j === cps.length - 1 && (bidiClasses.includes('R') || bidiClasses.includes('AL'))) {
                 if (bidiClasses[0] === 'R' || bidiClasses[0] === 'AL') {
                     for (let cls of bidiClasses) if (!['R', 'AL', 'AN', 'EN', 'ET', 'ES', 'CS', 'ON', 'BN', 'NSM'].includes(cls)) throwIdnaBidiError(`'${label}' breaks rule #2: Only R, AL, AN, EN, ET, ES, CS, ON, BN, NSM allowed in label (RFC 5893 §2.2)`);
                     if (!/(R|AL|EN|AN)(NSM)*$/.test(bidiClasses.join(''))) throwIdnaBidiError(`'${label}' breaks rule #3: label must end with R, AL, EN, or AN, followed by zero or more NSM (RFC 5893 §2.3)`);

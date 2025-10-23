@@ -1,5 +1,5 @@
 {
-    "description": "Bidi Rule 4 — fail: mixed EN and AN",
+    "description": "mixed EN and AN not affected by BiDi rules (no R or AL char present)",
     "data": "1١",
-    "valid": false
+    "valid": true
 }

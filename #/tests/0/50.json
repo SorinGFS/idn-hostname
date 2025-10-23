@@ -1,6 +1,6 @@
 {
-    "description": "KATAKANA MIDDLE DOT with Hiragana valid for RFC 5890-5892, but fails Bidi rule 1",
+    "description": "KATAKANA MIDDLE DOT with Hiragana",
     "comment": "https://tools.ietf.org/html/rfc5891#section-4.2.3.3 https://tools.ietf.org/html/rfc5892#appendix-A.7",
     "data": "・ぁ",
-    "valid": false
+    "valid": true
 }

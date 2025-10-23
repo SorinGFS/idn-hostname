@@ -1,5 +1,5 @@
 {
-    "description": "Bidi Rule 5 — fail: starts L but contains AN (disallowed)",
+    "description": "mixed L with AN not affected by BiDi rules (no R or AL char present)",
     "data": "g١",
-    "valid": false
+    "valid": true
 }
