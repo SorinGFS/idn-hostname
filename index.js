@@ -64,8 +64,8 @@ function cpHex(cp) {
 function isIdnHostname(hostname) {
     // basic hostname checks
     if (typeof hostname !== 'string') throwIdnaSyntaxError('Label must be a string (RFC 5890 §2.3.2.3).');
-    // split hostname in labels
-    const rawLabels = hostname.split('.');
+    // split hostname in labels by the separators defined in uts#46 §2.3
+    const rawLabels = hostname.split(/[\x2E\uFF0E\u3002\uFF61]/);
     if (rawLabels.some((label) => label.length === 0)) throwIdnaLengthError('Label cannot be empty (consecutive or leading/trailing dot) (RFC 5890 §2.3.2.3).');
     // checks per label (IDNA is defined for labels, not for parts of them and not for complete domain names. RFC 5890 §2.3.2.1)
     let aceHostnameLength = 0;
