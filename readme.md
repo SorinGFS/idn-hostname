@@ -105,7 +105,7 @@ Each release will have its `major` and `minor` version identical with the relate
 6. **Mapping phase (at validation time)**:
 
     - For each input label the validator:
-        1. Splits the hostname into labels (by `.`). Empty labels are rejected.
+        1. Splits the hostname into labels (by `.` or alternate label separators). Empty labels are rejected.
         2. For each label, maps codepoints according to `mappings` (`valid` and `deviation` are passed as they are, `mapped` are replaced with the corresponding codepoints, `ignored` are ignored, any other chars are triggering `IdnaUnicodeError`).
         3. Normalizes the resulting mapped label with NFC.
         4. Checks length limits (label ≤ 63, full name ≤ 253 octets after ASCII punycode conversion).
@@ -155,6 +155,7 @@ Each release will have its `major` and `minor` version identical with the relate
 
 ## What does _not_ do
 
+-   This validator does not support `context` or `locale` specific [Special Casing](https://www.unicode.org/Public/16.0.0/ucd/SpecialCasing.txt) mappings. For such needs some sort of `mapping` must be done before using this validator.
 -   This validator does not support `UTS#46 useTransitional` backward compatibility flag.
 -   This validator does not support `UTS#46 STD3 ASCII rules`, when required they can be enforced on separate layer.
 -   This validator does not attempt to resolve or query DNS — it only validates label syntax/mapping/contextual/bidi rules.

@@ -142,6 +142,7 @@ function isIdnHostname(hostname) {
             // validate bidi
             bidiClasses.push(getRange(bidi_ranges, cp));
             if (j === cps.length - 1 && (bidiClasses.includes('R') || bidiClasses.includes('AL'))) {
+                // order of chars in label (RFC 5890 §2.3.3)
                 if (bidiClasses[0] === 'R' || bidiClasses[0] === 'AL') {
                     for (let cls of bidiClasses) if (!['R', 'AL', 'AN', 'EN', 'ET', 'ES', 'CS', 'ON', 'BN', 'NSM'].includes(cls)) throwIdnaBidiError(`'${label}' breaks rule #2: Only R, AL, AN, EN, ET, ES, CS, ON, BN, NSM allowed in label (RFC 5893 §2.2)`);
                     if (!/(R|AL|EN|AN)(NSM)*$/.test(bidiClasses.join(''))) throwIdnaBidiError(`'${label}' breaks rule #3: label must end with R, AL, EN, or AN, followed by zero or more NSM (RFC 5893 §2.3)`);
