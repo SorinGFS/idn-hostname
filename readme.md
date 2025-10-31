@@ -1,6 +1,9 @@
 ---
+
 title: IDN Hostname
+
 description: A validator for Internationalized Domain Names (`IDNA`) in conformance with the current standards.
+
 ---
 
 ## Overview
