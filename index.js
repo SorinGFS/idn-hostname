@@ -80,7 +80,7 @@ function isIdnHostname(hostname) {
             } catch (e) {
                 throwPunycodeError(`Invalid ASCII Compatible Encoding (ACE) of label '${rawLabel}' (RFC 5891 §4.4 → RFC 3492).`);
             }
-            if (/[\p{ASCII}]/u.test(label)) throwIdnaSyntaxError(`decoded A-label '${rawLabel}' result U-label '${label}' cannot be empty or all-ASCII character(s) (RFC 5890 §2.3.2.1).`);
+            if (!/[^\p{ASCII}]/u.test(label)) throwIdnaSyntaxError(`decoded A-label '${rawLabel}' result U-label '${label}' cannot be empty or all-ASCII character(s) (RFC 5890 §2.3.2.1).`);
             if (punycode.encode(label) !== aceBody) throwPunycodeError(`Re-encode mismatch for ASCII Compatible Encoding (ACE) label '${rawLabel}' (RFC 5891 §4.4 → RFC 3492).`);
         }
         // mapping phase (here because decoded A-label may contain disallowed chars)
