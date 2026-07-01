@@ -82,16 +82,18 @@ function isIdnHostname(hostname) {
     const rawLabels = hostname.split(/[\x2E\uFF0E\u3002\uFF61]/);
     if (rawLabels.some((label) => label.length === 0)) throwIdnaLengthError('Label cannot be empty (consecutive or leading/trailing dot) (RFC 5890 §2.3.2.3).');
     let isBidiHostname = false;
-    for (const char of hostname) {
-        const bidiClass = getRange(bidi_ranges, char.codePointAt(0));
-        // An RTL label is a label that contains at least one character of type R, AL, or AN. (RFC 5893 §1.4)
-        if (bidiClass === 'R' || bidiClass === 'AL' || bidiClass === 'AN') {
-            // A "Bidi domain name" is a domain name that contains at least one RTL label. (RFC 5893 §1.4)
-            isBidiHostname = true;
-            break;
+    try {     
+        for (const char of punycode.toUnicode(hostname)) {
+            const bidiClass = getRange(bidi_ranges, char.codePointAt(0));
+            // An RTL label is a label that contains at least one character of type R, AL, or AN. (RFC 5893 §1.4)
+            if (bidiClass === 'R' || bidiClass === 'AL' || bidiClass === 'AN') {
+                // A "Bidi domain name" is a domain name that contains at least one RTL label. (RFC 5893 §1.4)
+                isBidiHostname = true;
+                break;
+            }
+            // Note that RFC 5893 §2.1 changes the RTL definition based on what the first char is (if first char is L, RTL become LTR despite the fact that contains R, AL or AN)
         }
-        // Note that RFC 5893 §2.1 changes the RTL definition based on what the first char is (if first char is L, RTL become LTR despite the fact that contains R, AL or AN)
-    }
+    } catch (e) {/* punycode errors are deferred to be catched per label */}
     // checks per label (IDNA is defined for labels, not for parts of them and not for complete domain names. RFC 5890 §2.3.2.1)
     let aceHostnameLength = 0;
     for (const rawLabel of rawLabels) {
