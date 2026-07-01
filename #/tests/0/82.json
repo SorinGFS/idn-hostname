@@ -1,5 +1,5 @@
 {
-    "description": "mixed L with AN not affected by BiDi rules (no R or AL char present)",
+    "description": "Bidi Rule 5 — fail: has L and AN, but only L, EN, ET, ES, CS, ON, BN, NSM allowed in Bidi domain name LTR label",
     "data": "g١",
-    "valid": true
+    "valid": false
 }

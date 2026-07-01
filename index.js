@@ -3,13 +3,27 @@
 const punycode = require('punycode/');
 const { props, viramas, ranges, mappings, bidi_ranges, joining_type_ranges } = require('./idnaMappingTableCompact.json');
 // --- Error classes (short messages; RFC refs included in message) ---
-const throwIdnaContextJError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: "IdnaContextJError" }); };
-const throwIdnaContextOError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: "IdnaContextOError" }); };
-const throwIdnaUnicodeError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: "IdnaUnicodeError" }); };
-const throwIdnaLengthError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: "IdnaLengthError" }); };
-const throwIdnaSyntaxError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: "IdnaSyntaxError" }); };
-const throwPunycodeError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: "PunycodeError" }); };
-const throwIdnaBidiError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: "IdnaBidiError" }); };
+const throwIdnaContextJError = (msg) => {
+    throw Object.assign(new SyntaxError(msg), { name: 'IdnaContextJError' });
+};
+const throwIdnaContextOError = (msg) => {
+    throw Object.assign(new SyntaxError(msg), { name: 'IdnaContextOError' });
+};
+const throwIdnaUnicodeError = (msg) => {
+    throw Object.assign(new SyntaxError(msg), { name: 'IdnaUnicodeError' });
+};
+const throwIdnaLengthError = (msg) => {
+    throw Object.assign(new SyntaxError(msg), { name: 'IdnaLengthError' });
+};
+const throwIdnaSyntaxError = (msg) => {
+    throw Object.assign(new SyntaxError(msg), { name: 'IdnaSyntaxError' });
+};
+const throwPunycodeError = (msg) => {
+    throw Object.assign(new SyntaxError(msg), { name: 'PunycodeError' });
+};
+const throwIdnaBidiError = (msg) => {
+    throw Object.assign(new SyntaxError(msg), { name: 'IdnaBidiError' });
+};
 // --- constants ---
 const ZWNJ = 0x200c;
 const ZWJ = 0x200d;
@@ -67,6 +81,17 @@ function isIdnHostname(hostname) {
     // split hostname in labels by the separators defined in uts#46 §2.3
     const rawLabels = hostname.split(/[\x2E\uFF0E\u3002\uFF61]/);
     if (rawLabels.some((label) => label.length === 0)) throwIdnaLengthError('Label cannot be empty (consecutive or leading/trailing dot) (RFC 5890 §2.3.2.3).');
+    let isBidiHostname = false;
+    for (const char of hostname) {
+        const bidiClass = getRange(bidi_ranges, char.codePointAt(0));
+        // An RTL label is a label that contains at least one character of type R, AL, or AN. (RFC 5893 §1.4)
+        if (bidiClass === 'R' || bidiClass === 'AL' || bidiClass === 'AN') {
+            // A "Bidi domain name" is a domain name that contains at least one RTL label. (RFC 5893 §1.4)
+            isBidiHostname = true;
+            break;
+        }
+        // Note that RFC 5893 §2.1 changes the RTL definition based on what the first char is (if first char is L, RTL become LTR despite the fact that contains R, AL or AN)
+    }
     // checks per label (IDNA is defined for labels, not for parts of them and not for complete domain names. RFC 5890 §2.3.2.1)
     let aceHostnameLength = 0;
     for (const rawLabel of rawLabels) {
@@ -137,21 +162,23 @@ function isIdnHostname(hostname) {
                 }
             }
             // check mixed digit sets
-            if ((cp >= 0x0660 && cp <= 0x0669) || (cp >= 0x06f0 && cp <= 0x06f9)) digits += (cp < 0x06f0 ? 'a' : 'e' );
+            if ((cp >= 0x0660 && cp <= 0x0669) || (cp >= 0x06f0 && cp <= 0x06f9)) digits += cp < 0x06f0 ? 'a' : 'e';
             if (j === cps.length - 1 && /^(?=.*a)(?=.*e).*$/.test(digits)) throwIdnaContextOError('Arabic-Indic digits cannot be mixed with Extended Arabic-Indic digits (RFC 5892 Appendix A.8/A.9).');
-            // validate bidi
-            bidiClasses.push(getRange(bidi_ranges, cp));
-            if (j === cps.length - 1 && (bidiClasses.includes('R') || bidiClasses.includes('AL'))) {
-                // order of chars in label (RFC 5890 §2.3.3)
-                if (bidiClasses[0] === 'R' || bidiClasses[0] === 'AL') {
-                    for (let cls of bidiClasses) if (!['R', 'AL', 'AN', 'EN', 'ET', 'ES', 'CS', 'ON', 'BN', 'NSM'].includes(cls)) throwIdnaBidiError(`'${label}' breaks rule #2: Only R, AL, AN, EN, ET, ES, CS, ON, BN, NSM allowed in label (RFC 5893 §2.2)`);
-                    if (!/(R|AL|EN|AN)(NSM)*$/.test(bidiClasses.join(''))) throwIdnaBidiError(`'${label}' breaks rule #3: label must end with R, AL, EN, or AN, followed by zero or more NSM (RFC 5893 §2.3)`);
-                    if (bidiClasses.includes('EN') && bidiClasses.includes('AN')) throwIdnaBidiError(`'${label}' breaks rule #4: EN and AN cannot be mixed in the same label (RFC 5893 §2.4)`);
-                } else if (bidiClasses[0] === 'L') {
-                    for (let cls of bidiClasses) if (!['L', 'EN', 'ET', 'ES', 'CS', 'ON', 'BN', 'NSM'].includes(cls)) throwIdnaBidiError(`'${label}' breaks rule #5: Only L, EN, ET, ES, CS, ON, BN, NSM allowed in label (RFC 5893 §2.5)`);
-                    if (!/(L|EN)(NSM)*$/.test(bidiClasses.join(''))) throwIdnaBidiError(`'${label}' breaks rule #6: label must end with L or EN, followed by zero or more NSM (RFC 5893 §2.6)`);
-                } else {
-                    throwIdnaBidiError(`'${label}' breaks rule #1: label must start with L or R or AL (RFC 5893 §2.1)`);
+            // validate bidi if hostname is Bidi domain name
+            if (isBidiHostname) {
+                bidiClasses.push(getRange(bidi_ranges, cp));
+                if (j === cps.length - 1) {
+                    // order of chars in label (RFC 5890 §2.3.3)
+                    if (bidiClasses[0] === 'R' || bidiClasses[0] === 'AL') {
+                        for (let cls of bidiClasses) if (!['R', 'AL', 'AN', 'EN', 'ET', 'ES', 'CS', 'ON', 'BN', 'NSM'].includes(cls)) throwIdnaBidiError(`'${label}' breaks rule #2: Only R, AL, AN, EN, ET, ES, CS, ON, BN, NSM allowed in Bidi domain name RTL label (RFC 5893 §2.2)`);
+                        if (!/(R|AL|EN|AN)(NSM)*$/.test(bidiClasses.join(''))) throwIdnaBidiError(`'${label}' breaks rule #3: Bidi domain name RTL label must end with R, AL, EN, or AN, followed by zero or more NSM (RFC 5893 §2.3)`);
+                        if (bidiClasses.includes('EN') && bidiClasses.includes('AN')) throwIdnaBidiError(`'${label}' breaks rule #4: EN and AN cannot be mixed in the same Bidi domain name label (RFC 5893 §2.4)`);
+                    } else if (bidiClasses[0] === 'L') {
+                        for (let cls of bidiClasses) if (!['L', 'EN', 'ET', 'ES', 'CS', 'ON', 'BN', 'NSM'].includes(cls)) throwIdnaBidiError(`'${label}' breaks rule #5: Only L, EN, ET, ES, CS, ON, BN, NSM allowed in Bidi domain name LTR label (RFC 5893 §2.5)`);
+                        if (!/(L|EN)(NSM)*$/.test(bidiClasses.join(''))) throwIdnaBidiError(`'${label}' breaks rule #6: Bidi domain name LTR label must end with L or EN, followed by zero or more NSM (RFC 5893 §2.6)`);
+                    } else {
+                        throwIdnaBidiError(`'${label}' breaks rule #1: Bidi domain name label must start with L or R or AL (RFC 5893 §2.1)`);
+                    }
                 }
             }
         }
@@ -166,7 +193,7 @@ const idnHostname = (string) =>
         string
             .split('.')
             .map((label) => uts46map(label).normalize('NFC'))
-            .join('.')
+            .join('.'),
     );
 // export
 module.exports = { isIdnHostname, idnHostname, uts46map, punycode };

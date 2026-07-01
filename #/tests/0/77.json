@@ -1,5 +1,5 @@
 {
-    "description": "mixed EN and AN not affected by BiDi rules (no R or AL char present)",
+    "description": "Bidi Rule 1 — fail: only EN and AN, Bidi domain name label must start with L or R or AL",
     "data": "1١",
-    "valid": true
+    "valid": false
 }
