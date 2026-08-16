@@ -1,302 +1,313 @@
 ---
 
 title: IDN Hostname
-
-description: A validator for Internationalized Domain Names (`IDNA`) in conformance with the current standards.
+description: "A validator for Internationalized Domain Names (IDNA2008) with nontransitional UTS #46 preprocessing."
 
 ---
 
-## Overview
+# IDN Hostname
 
-This is a validator for Internationalized Domain Names (`IDNA`) in conformance with the current standards (`RFC 5890 - 5891 - 5892 - 5893 - 3492`) and the current adoption level of Unicode (`UTS#46`) in javascript (`15.1.0`).
+`idn-hostname` validates internationalized hostnames and converts valid input to ASCII Compatible Encoding (ACE). It combines:
 
-**Browser/Engine Support:** Modern browsers (Chrome, Firefox, Safari, Edge) and Node.js (v18+).
+- nontransitional [Unicode UTS #46](https://www.unicode.org/reports/tr46/) preprocessing;
+- IDNA2008 label validation from [RFC 5890](https://www.rfc-editor.org/rfc/rfc5890), [RFC 5891](https://www.rfc-editor.org/rfc/rfc5891), [RFC 5892](https://www.rfc-editor.org/rfc/rfc5892), and [RFC 5893](https://www.rfc-editor.org/rfc/rfc5893);
+- Punycode encoding and decoding from [RFC 3492](https://www.rfc-editor.org/rfc/rfc3492).
 
-This document explains, in plain terms, what this validator does, which RFC/UTS rules it enforces, what it intentionally **does not** check, and gives some relevant examples so you can see how hostnames are classified.
+The bundled immutable table targets Unicode 15.1.0. The package is CommonJS and depends on [`punycode`](https://www.npmjs.com/package/punycode). Browser use requires a bundler or runtime that supports those modules; the package does not declare a browser compatibility guarantee.
 
-The data source for the validator is a `json` constructed as follows:
+## Install
 
--   Baseline = Unicode `IdnaMappingTable` with allowed chars (based on props: valid/mapped/deviation/ignored/disallowed).
--   Viramas = Unicode `DerivedCombiningClass` with `viramas`(Canonical_Combining_Class=Virama).
--   Overlay 1 = Unicode `IdnaMappingTable` for mappings applied on top of the baseline.
--   Overlay 2 = Unicode `DerivedJoinTypes` for join types (D,L,R,T,U) applied on top of the baseline.
--   Overlay 3 = Unicode `DerivedBidiClass` for bidi classes (L,R,AL,NSM,EN,ES,ET,AN,CS,BN,B,S,WS,ON) applied on top of the baseline.
-
-## Usage
-
-**Install:**
-```js title="js"
-npm i idn-hostname
+```sh
+npm install idn-hostname
 ```
 
-**Import the idn-hostname validator:**
-```js title="js"
-const  { isIdnHostname } = require('idn-hostname');
-// the validator is returning true or detailed error
+## API
+
+### Validate a hostname
+
+`isIdnHostname(hostname)` returns `true` or throws a `SyntaxError` object with a specific error `name` at the first detected violation.
+
+```js
+const { isIdnHostname } = require('idn-hostname');
+
 try {
-    if ( isIdnHostname('abc')) console.log(true);
+    isIdnHostname('mañana.example');
+    console.log('valid');
 } catch (error) {
-    console.log(error.message);
+    console.error(error.name, error.message);
 }
 ```
 
-**Import the idn-hostname ACE converter:**
-```js title="js"
-const  { idnHostname } = require('idn-hostname');
-// the idnHostname is returning the ACE hostname or detailed error (it also validates the input)
+### Convert a hostname to ACE
+
+`idnHostname(hostname)` validates the input and returns its ASCII form.
+
+```js
+const { idnHostname } = require('idn-hostname');
+
 try {
-    const idna = idnHostname('abc');
+    console.log(idnHostname('mañana.example'));
+    // xn--maana-pta.example
 } catch (error) {
-    console.log(error.message);
+    console.error(error.name, error.message);
 }
 ```
 
-**Import the punycode converter (convenient exposure of punycode functions):**
-```js title="js"
-const  { idnHostname, punycode } = require('idn-hostname');
-// get the unicode version of an ACE hostname or detailed error
+### Apply UTS #46 preprocessing to one label
+
+`uts46map(label)` applies the package's nontransitional, STD3-disabled preprocessing policy. It does not perform NFC normalization or the complete final IDNA2008 validation.
+
+```js
+const { uts46map } = require('idn-hostname');
+
 try {
-    const uLabel = punycode.toUnicode(idnHostname('abc'));
-    // or simply use the punycode API for some needs
+    const label = uts46map('ＡＢＣ').normalize('NFC');
+    console.log(label); // abc
 } catch (error) {
-    console.log(error.message);
+    console.error(error.name, error.message);
 }
 ```
 
-**Import the UTS46 mapping function:**
-```js title="js"
-const  { uts46map } = require('idn-hostname');
-// the uts46map is returning the uts46 mapped label (not hostname) or an error if label has dissallowed or unassigned chars
-try {
-    const label = uts46map('abc').normalize('NFC');
-} catch (error) {
-    console.log(error.message);
-}
+### Access the Punycode dependency
+
+The exported `punycode` object is the low-level dependency, not a replacement for IDNA validation. Use `idnHostname` when converting a hostname for use.
+
+```js
+const { punycode } = require('idn-hostname');
+
+console.log(punycode.toUnicode('xn--maana-pta')); // mañana
 ```
 
-## Versioning
+## Processing model
 
-Each release will have its `major` and `minor` version identical with the related `unicode` version, and the `minor` version variable. No `major` or `minor` (structural) changes are expected other than a `unicode` version based updated `json` data source.
+The validator deliberately separates compatibility preprocessing from final eligibility:
 
-## What does (point-by-point)
+1. Split the hostname at UTS #46 label separators and reject empty labels, including a trailing root label.
+2. Apply nontransitional UTS #46 mappings with STD3 rules disabled.
+3. Normalize ordinary Unicode input to NFC.
+4. Recognize and decode an ACE prefix after preprocessing, so case and compatibility mappings cannot hide or create an unchecked prefix.
+5. Require a decoded A-label to already be NFC; decoded Punycode is not remapped or normalized into validity.
+6. Check every resulting code point against the final/default IDNA table.
+7. Apply hyphen, leading-mark, CONTEXTJ, CONTEXTO, bidi, ACE round-trip, and DNS length checks.
 
-1. **Baseline data**: uses the Unicode `IdnaMappingTable` (RFC 5892 / Unicode UCD) decoded into per-code-point classes (PVALID, DISALLOWED, CONTEXTJ, CONTEXTO, UNASSIGNED).
+This order permits sequences such as Hangul Jamo to compose into an eligible syllable during NFC while still rejecting mapped output that remains ineligible.
 
-    - Reference: RFC 5892 (IDNA Mapping Table derived from Unicode).
+<details>
+<summary><strong>Complete validation pipeline</strong></summary>
 
-2. **UTS#46 overlay**: applies UTS#46 statuses/mappings on top of the baseline. Where `UTS#46` marks a code point as `valid`, `mapped`, `deviation`, `ignored` or `disallowed`, those override the baseline for that codepoint. Mappings from `UTS#46` are stored in the `mappings` layer.
+For each hostname, the implementation:
 
-    - Reference: `UTS#46` (Unicode IDNA Compatibility Processing).
+1. Requires a JavaScript string.
+2. Splits labels on U+002E, U+FF0E, U+3002, and U+FF61.
+3. Rejects leading, trailing, or consecutive separators because they create an empty label.
+4. Determines whether the hostname requires RFC 5893 bidi enforcement.
+5. Preserves the existing raw non-ASCII A-label syntax check before preprocessing.
+6. Applies `uts46map` and NFC to ordinary input.
+7. If the preprocessed label starts with `xn--`:
+   - requires ASCII input;
+   - decodes the Punycode payload;
+   - rejects an empty or all-ASCII decoded U-label;
+   - requires the decoded U-label to already be NFC;
+   - requires exact decode/re-encode agreement after preprocessing has normalized the ACE label's case.
+8. Converts the resulting label to ASCII for length accounting and requires at most 63 ASCII octets.
+9. Rejects a leading or trailing hyphen and hyphens in positions 3 and 4 of a U-label.
+10. Rejects a leading Unicode mark.
+11. Spreads the label into code points once and uses the existing per-code-point loop to:
+    - require final `valid` or nontransitional `deviation` eligibility;
+    - enforce CONTEXTJ and CONTEXTO rules;
+    - enforce RFC 5893 bidi rules when the hostname is bidi.
+12. Requires the complete ASCII presentation form, without a trailing root dot, to contain at most 253 octets.
 
-3. **Join Types overlay**: uses the Unicode `DerivedJoinTypes` to apply char join types on top of the baseline. Mappings from Join Types are stored in the `joining_type_ranges` layer.
+The 63-octet label limit and 255-octet DNS wire-format limit come from the DNS size limits described by RFC 1035 and RFC 5890. The implementation's 253-character presentation-form limit accounts for separators while intentionally disallowing a trailing root dot.
 
-    - Reference: `RFC 5892` (The Unicode Code Points and IDNA).
+</details>
 
-4. **BIDI overlay**: uses the Unicode `DerivedBidiClass` to apply BIDI derived classes on top of the baseline. Mappings from BIDI are stored in the `bidi_ranges` layer.
+## Enforced label rules
 
-    - Reference: `RFC 5893` (Right-to-Left Scripts for IDNA).
+<details>
+<summary><strong>Hyphen, normalization, ACE, and leading-mark rules</strong></summary>
 
-5. **Compact four-layer data source**: the script uses a compact JSON (`idnaMappingTableCompact.json`) merged from three data sources with:
+- A label cannot begin or end with U+002D HYPHEN-MINUS.
+- A U-label cannot contain hyphens in positions 3 and 4.
+- A label cannot begin with a Unicode character in General Category `M`.
+- An apparent A-label must contain only ASCII after preprocessing and must decode successfully.
+- A decoded A-label must produce a non-ASCII U-label in NFC and round-trip through Punycode.
+- Final code points must be eligible after preprocessing and normalization.
 
-    - `props` — list of property names (`valid`,`mapped`,`deviation`,`ignored`,`disallowed`),
-    - `viramas` — list of `virama` codepoints (Canonical_Combining_Class=Virama),
-    - `ranges` — merged contiguous ranges with a property index,
-    - `mappings` — map from code point → sequence of code points (for `mapped`/`deviation`),
-    - `joining_type_ranges` — merged contiguous ranges with a property index.
-    - `bidi_ranges` — merged contiguous ranges with a property index.
+References: RFC 5890 §2.3.2.1; RFC 5891 §4.2.3 and §5.4; UTS #46 §4.1.
 
-6. **Mapping phase (at validation time)**:
+</details>
 
-    - For each input label the validator:
-        1. Splits the hostname into labels (by `.` or alternate label separators). Empty labels are rejected.
-        2. For each label, maps codepoints according to `mappings` (`valid` and `deviation` are passed as they are, `mapped` are replaced with the corresponding codepoints, `ignored` are ignored, any other chars are triggering `IdnaUnicodeError`).
-        3. Normalizes the resulting mapped label with NFC.
-        4. Checks length limits (label ≤ 63, full name ≤ 253 octets after ASCII punycode conversion).
-        5. Validates label-level rules (leading combining/enclosing marks forbidden, hyphen rules, ACE/punycode re-encode correctness).
-        6. Spreads each label into code points for contextual and bidi checks.
-        7. Performs contextual checks (CONTEXTJ, CONTEXTO) using the `joining_type_ranges` from compact table (e.g. virama handling for ZWJ/ZWNJ, Catalan middle dot rule, Hebrew geresh/gershayim rule, Katakana middle dot contextual rule, Arabic digit mixing rule).
-        8. Checks Bidi rules using the `bidi_ranges` from compact table.
-    - See the sections below for exact checks and RFC references.
+<details>
+<summary><strong>CONTEXTJ and CONTEXTO rules</strong></summary>
 
-7. **Punycode / ACE checking**:
+The validator implements checks for every RFC 5892 Appendix A contextual-rule family, including CONTEXTO checks that lookup-only applications are not universally required to evaluate:
 
-    - If a label starts with the ACE prefix `xn--`, the validator will decode the ACE part (using punycode), verify decoding succeeds, and re-encode to verify idempotency (the encoded value must match the original ACE, case-insensitive).
-    - If punycode decode or re-encode fails, the label is rejected.
-    - Reference: RFC 5890 §2.3.2.1, RFC 3492 (Punycode).
+- **U+200C ZWNJ:** accepted after a virama or when its joining-type context satisfies RFC 5892 Appendix A.1.
+- **U+200D ZWJ:** accepted only immediately after a virama.
+- **U+00B7 MIDDLE DOT:** accepted only between two lowercase ASCII `l` characters after preprocessing. An uppercase `L` in ordinary input is mapped to lowercase before this check.
+- **U+0375 GREEK LOWER NUMERAL SIGN:** must be followed by a Greek-script character.
+- **U+05F3/U+05F4 Hebrew punctuation:** must follow a Hebrew-script character.
+- **U+30FB KATAKANA MIDDLE DOT:** requires at least one Hiragana, Katakana, or Han character in the label.
+- **Arabic digit sets:** U+0660–U+0669 and U+06F0–U+06F9 cannot occur together in one label.
 
-8. **Leading/trailing/compressed-hyphens**:
+Reference: RFC 5892 Appendix A.1–A.9.
 
-    - Labels cannot start or end with `-` (LDH rule).
-    - ACE/punycode special rule: labels containing `--` at positions 3–4 (that’s the ACE indicator) and not starting with `xn` are invalid (RFC 5891 §4.2)
+</details>
 
-9. **Combining/enclosing marks**:
+<details>
+<summary><strong>Bidirectional-text rules</strong></summary>
 
-    - A label may not start with General Category `M` — i.e. combining or enclosing mark at the start of a label is rejected. (RFC 5891 §4.2.3.2)
+If the hostname contains an RTL label, every label is checked under RFC 5893:
 
-10. **Contextual checks (exhaustive requirements from RFC 5892 A.1-A.9 appendices)**:
+- an RTL label must begin with `R` or `AL`, use only the permitted classes, and end with `R`, `AL`, `EN`, or `AN`, followed by optional `NSM` characters;
+- an RTL label cannot mix `EN` and `AN` digits;
+- an LTR label must begin with `L`, use only the permitted classes, and end with `L` or `EN`, followed by optional `NSM` characters.
 
-    - ZWNJ / ZWJ: allowed in context only (CONTEXTJ) (Appendix A.1/A.2, RFC 5892 and PR-37). Implemented checks:
-        - ZWJ/ZWNJ allowed without other contextual condition if preceded by a virama (a diacritic mark used in many Indic scripts to suppress the inherent vowel that normally follows a consonant).
-        - ZWNJ (if not preceded by virama) allowed only if joining context matches the RFC rules.
-    - Middle dot (U+00B7): allowed only between two `l` / `L` (Catalan rule). (RFC 5891 §4.2.3.3; RFC 5892 Appendix A.3)
-    - Greek keraia (U+0375): must be followed by a Greek letter. (RFC 5892 Appendix A.4)
-    - Hebrew geresh/gershayim (U+05F3 / U+05F4): must follow a Hebrew letter. (RFC 5892 Appendix A.5/A.6)
-    - Katakana middle dot (U+30FB): allowed if the label contains at least one character in Hiragana/Katakana/Han. (RFC 5892 Appendix A.7)
-    - Arabic/Extended Arabic digits: the mix of Arabic-Indic digits (U+0660–U+0669) with Extended Arabic-Indic digits (U+06F0–U+06F9) within the same label is not allowed. (RFC 5892 Appendix A.8/A.9)
+Reference: RFC 5893 §2.
 
-11. **Bidi enforcement**:
+</details>
 
-    - In the Unicode Bidirectional Algorithm (BiDi), characters are assigned to bidirectional classes that determine their behavior in mixed-direction text. These classes are used by the algorithm to resolve the order of characters. If given input is breaking one of the six Bidi rules the label is rejected. (RFC 5893)
+## Unicode data
 
-12. **Total and per-label length**:
+The deployment JSON is generated directly from authoritative Unicode 15.1.0 text files:
 
-    - Total ASCII length (after ASCII conversion of non-ASCII labels) must be ≤ 253 octets. (RFC 5890, RFC 3492)
+- [`IdnaMappingTable.txt`](https://www.unicode.org/Public/idna/15.1.0/IdnaMappingTable.txt) — UTS #46 statuses, mappings, and IDNA-version markers;
+- [`DerivedCombiningClass.txt`](https://www.unicode.org/Public/15.1.0/ucd/extracted/DerivedCombiningClass.txt) — canonical combining class 9 entries used as viramas;
+- [`DerivedJoiningType.txt`](https://www.unicode.org/Public/15.1.0/ucd/extracted/DerivedJoiningType.txt) — joining types used by the ZWNJ contextual rule;
+- [`DerivedBidiClass.txt`](https://www.unicode.org/Public/15.1.0/ucd/extracted/DerivedBidiClass.txt) — bidi classes used by RFC 5893 checks.
 
-13. **Failure handling**:
+`IdnaMappingTable.txt` is a UTS #46 data file, not the RFC 5892 derived-property table. The generator uses its `NV8` and `XV8` markers to keep preprocessing permission separate from final IDNA2008 eligibility.
 
-    - The validator throws short errors (single-line, named exceptions) at the first fatal violation encountered (the smallest error ends the function). Each thrown error includes the RFC/UTS rule reference in its message.
+The validator ships one table and does not select a Unicode version at runtime.
 
-## What does _not_ do
+<details>
+<summary><strong>Compact JSON schema and current counts</strong></summary>
 
--   This validator does not support `context` or `locale` specific [Special Casing](https://www.unicode.org/Public/16.0.0/ucd/SpecialCasing.txt) mappings. For such needs some sort of `mapping` must be done before using this validator.
--   This validator does not support `UTS#46 useTransitional` backward compatibility flag.
--   This validator does not support `UTS#46 STD3 ASCII rules`, when required they can be enforced on separate layer.
--   This validator does not attempt to resolve or query DNS — it only validates label syntax/mapping/contextual/bidi rules.
+`idnaMappingTableCompact.json` contains:
+
+| Member | Purpose | Unicode 15.1 count |
+| --- | --- | ---: |
+| `props` | Property names: `valid`, `mapped`, `deviation`, `ignored`, `disallowed` | 5 |
+| `ranges` | Final/default property ranges | 2,034 |
+| `uts46_ranges` | Preprocessing overrides used only when UTS #46 differs from `ranges` | 452 |
+| `mappings` | Non-empty preprocessing mappings keyed by source code point | 6,239 |
+| `viramas` | Code points with canonical combining class 9 | 65 |
+| `bidi_ranges` | Explicit bidi-class ranges | 1,530 |
+| `joining_type_ranges` | Explicit joining-type ranges | 506 |
+
+During preprocessing, `uts46_ranges` takes precedence and lookup falls back to `ranges`. After mapping and NFC—or after unmodified ACE decoding—final validation consults only `ranges` and accepts `valid` or `deviation`.
+
+Missing final/default ranges are treated as disallowed or unassigned. Deviation mappings are omitted because processing is nontransitional and leaves deviation code points unchanged.
+
+</details>
+
+## Errors
+
+The API stops at the first fatal violation. Every exported operation may throw a `SyntaxError` object with one of these names:
+
+<details>
+<summary><strong>Error names and responsibilities</strong></summary>
+
+| Error name | Responsibility |
+| --- | --- |
+| `IdnaUnicodeError` | Disallowed, unassigned, or finally ineligible code point |
+| `IdnaSyntaxError` | General label syntax, normalization, mark, or hyphen failure |
+| `IdnaLengthError` | Empty label or DNS label/hostname length failure |
+| `IdnaContextJError` | ZWNJ or ZWJ contextual failure |
+| `IdnaContextOError` | Other RFC 5892 contextual failure |
+| `IdnaBidiError` | RFC 5893 bidi failure |
+| `PunycodeError` | ACE decoding, re-encoding, or ASCII conversion failure |
+
+Messages include the relevant RFC or UTS reference. Error precedence follows the validator's processing order and is part of its current behavior.
+
+</details>
+
+## Intentional policy and limitations
+
+- Processing is nontransitional; the deprecated transitional mappings are not offered.
+- STD3 ASCII rules are disabled during preprocessing. This does not make otherwise ineligible code points valid after NFC.
+- The validator rejects a trailing root dot instead of accepting an absolute/FQDN presentation form.
+- It evaluates every implemented CONTEXTO rule, including during lookup-style use.
+- It performs no locale-specific casing or registration-policy processing.
+- It does not query DNS, determine whether a name is registered, or apply registry-specific script, confusability, or security policies.
+- Validation establishes conformance with this implementation's syntax and policy; it does not guarantee that a browser, resolver, registry, or registrar will accept the name.
 
 ## Examples
 
-### PASS examples
+<details>
+<summary><strong>Valid examples</strong></summary>
 
-```yaml title="yaml"
-  - hostname: "a"                       # single char label
-  - hostname: "a⁠b"                      # contains WORD JOINER (U+2060), ignored in IDNA table
-  - hostname: "example"                 # multi char label
-  - hostname: "host123"                 # label with digits
-  - hostname: "test-domain"             # label with hyphen-minus
-  - hostname: "my-site123"              # label with hyphen-minus and digits
-  - hostname: "sub.domain"              # multi-label
-  - hostname: "mañana"                  # contains U+00F1
-  - hostname: "xn--maana-pta"           # ACE for mañana
-  - hostname: "bücher"                  # contains U+00FC
-  - hostname: "xn--bcher-kva"           # ACE for bücher
-  - hostname: "café"                    # contains U+00E9
-  - hostname: "xn--caf-dma"             # ACE for café
-  - hostname: "straße"                  # German sharp s; allowed via exceptions
-  - hostname: "façade"                  # French ç
-  - hostname: "élève"                   # French é and è
-  - hostname: "Γειά"                    # Greek
-  - hostname: "åland"                   # Swedish å
-  - hostname: "naïve"                   # Swedish ï
-  - hostname: "smörgåsbord"             # Swedish ö
-  - hostname: "пример"                  # Cyrillic
-  - hostname: "пример.рф"               # multi-label Cyrillic
-  - hostname: "xn--d1acpjx3f.xn--p1ai"  # ACE for Cyrillic
-  - hostname: "مثال"                    # Arabic
-  - hostname: "דוגמה"                   # Hebrew
-  - hostname: "예시"                     # Korean Hangul
-  - hostname: "ひらがな"                 # Japanese Hiragana
-  - hostname: "カタカナ"                 # Japanese Katakana
-  - hostname: "例.例"                    # multi-label Japanese Katakana
-  - hostname: "例子"                    # Chinese Han
-  - hostname: "สาธิต"                    # Thai
-  - hostname: "ຕົວຢ່າງ"                   # Lao
-  - hostname: "उदाहरण"                  # Devanagari
-  - hostname: "क्‍ष"                      # Devanagari with Virama + ZWJ
-  - hostname: "क्‌ष"                     # Devanagari with Virama + ZWNJ
-  - hostname: "l·l"                     # Catalan middle dot between 'l' (U+00B7)
-  - hostname: "L·l"                     # Catalan middle dot between mixed case 'l' chars
-  - hostname: "L·L"                     # Catalan middle dot between 'L' (U+004C)
-  - hostname: "( "a".repeat(63) ) "     # 63 'a's (label length OK)
+```js
+[
+    'example',
+    'sub.example',
+    'mañana',
+    'xn--maana-pta',
+    'bücher',
+    'пример.рф',
+    'مثال',
+    'דוגמה',
+    '例子',
+    'l·l',
+    'L·l',        // uppercase ASCII is mapped to lowercase first
+    'क्‍ष',       // virama + ZWJ
+    'क्‌ष',       // virama + ZWNJ
+    'a⁠b',        // U+2060 is ignored during preprocessing
+    '가',        // Hangul Jamo normalize to 가
+]
 ```
 
-### FAIL examples
+</details>
 
-```yaml title="yaml"
-  - hostname: ""                          # empty hostname
-  - hostname: "-abc"                      # leading hyphen forbidden (LDH)
-  - hostname: "abc-"                      # trailing hyphen forbidden (LDH)
-  - hostname: "a b"                       # contains space
-  - hostname: "a	b"                # contains control/tab
-  - hostname: "a@b"                       # '@'
-  - hostname: ".abc"                      # leading dot → empty label
-  - hostname: "abc."                      # trailing dot → empty label (unless FQDN handling expects trailing dot)
-  - hostname: "a..b"                      # empty label between dots
-  - hostname: "a.b..c"                    # empty label between dots
-  - hostname: "a#b"                       # illegal char '#'
-  - hostname: "a$b"                       # illegal char '$'
-  - hostname: "abc/def"                   # contains slash
-  - hostname: "a\b"                       # contains backslash
-  - hostname: "a%b"                       # contains percent sign
-  - hostname: "a^b"                       # contains caret
-  - hostname: "a*b"                       # contains asterisk
-  - hostname: "a(b)c"                     # contains parentheses
-  - hostname: "a=b"                       # contains equal sign
-  - hostname: "a+b"                       # contains plus sign
-  - hostname: "a,b"                       # contains comma
-  - hostname: "a@b"                       # contains '@'
-  - hostname: "a;b"                       # contains semicolon
-  - hostname: "\n"                        # contains newline
-  - hostname: "·"                         # middle-dot without neighbors
-  - hostname: "a·"                        # middle-dot at end
-  - hostname: "·a"                        # middle-dot at start
-  - hostname: "a·l"                       # middle dot not between two 'l' (Catalan rule)
-  - hostname: "l·a"                       # middle dot not between two 'l'
-  - hostname: "α͵"                        # Greek keraia not followed by Greek
-  - hostname: "α͵S"                       # Greek keraia followed by non-Greek
-  - hostname: "٠۰"                        # Arabic-Indic & Extended Arabic-Indic digits mixed
-  - hostname: ( "a".repeat(64) )          # label length > 63
-  - hostname: "￿"                         # noncharacter (U+FFFF) disallowed in IDNA table
-  - hostname: "a‌"                         # contains ZWNJ (U+200C) at end (contextual rules fail)
-  - hostname: "a‍"                         # contains ZWJ (U+200D) at end (contextual rules fail)
-  - hostname: "̀hello"                     # begins with combining mark (U+0300)
-  - hostname: "҈hello"                    # begins with enclosing mark (U+0488)
-  - hostname: "실〮례"                      # contains HANGUL SINGLE DOT TONE MARK (U+302E)
-  - hostname: "control\x01char"           # contains control character
-  - hostname: "abc\u202Edef"              # bidi formatting codepoint, disallowed in IDNA table
-  - hostname: "́"                          # contains combining mark (U+0301)
-  - hostname: "؜"                          # contains Arabic control (control U+061C)
-  - hostname: "۝"                         # Arabic end of ayah (control U+06DD)
-  - hostname: "〯"                        # Hangul double-dot (U+302F), disallowed in IDNA table
-  - hostname: "a￰b"                        # contains noncharacter (U+FFF0) in the middle
-  - hostname: "emoji😀"                   # emoji (U+1F600), disallowed in IDNA table
-  - hostname: "label\uD800"               # contains high surrogate on its own
-  - hostname: "\uDC00label"               # contains low surrogate on its own
-  - hostname: "a‎"                         # contains left-to-right mark (control formatting)
-  - hostname: "a‏"                         # contains right-to-left mark (control formatting)
-  - hostname: "xn--"                      # ACE prefix without payload
-  - hostname: "xn---"                     # triple hyphen-minus (extra '-') in ACE
-  - hostname: "xn---abc"                  # triple hyphen-minus followed by chars
-  - hostname: "xn--aa--bb"                # ACE payload having hyphen-minus in the third and fourth position
-  - hostname: "xn--xn--double"            # ACE payload that is also ACE
-  - hostname: "xn--X"                     # invalid punycode (decode fails)
-  - hostname: "xn--abcナ"                 # ACE containing non-ASCII char
-  - hostname: "xn--abc\x00"               # ACE containing control/NUL
-  - hostname: "xn--abc\uFFFF"             # ACE containing noncharacter
+<details>
+<summary><strong>Invalid examples</strong></summary>
+
+```js
+[
+    '',
+    '.example',
+    'example.',       // trailing root labels are intentionally rejected
+    'a..b',
+    '-abc',
+    'abc-',
+    'a b',
+    'emoji😀',
+    'a·l',            // U+00B7 is not between two l characters
+    'a‌',              // ZWNJ lacks a valid context
+    'a‍',              // ZWJ is not preceded by a virama
+    '̀hello',          // begins with a combining mark
+    '٠۰',              // mixes the two Arabic digit sets
+    '¼',               // maps through finally ineligible U+2044
+]
 ```
 
-:::note
+Some examples contain invisible format characters. Keep source encoding intact when copying them.
 
-Far from being exhaustive, the examples are illustrative and chosen to demonstrate rule coverage. Also:
-- some of the characters are invisible,
-- some unicode codepoints that cannot be represented in `yaml` (those having `\uXXXX`) should be considered as `json`.
+</details>
 
-:::
+## Qualification
 
-**References (specs)**
+The Unicode 15.1 deployment has been checked against:
 
--   `RFC 5890` — Internationalized Domain Names for Applications (IDNA): Definitions and Document Framework.
--   `RFC 5891` — IDNA2008: Protocol and Implementation (label rules, contextual rules, ACE considerations).
--   `RFC 5892` — IDNA Mapping Table (derived from Unicode).
--   `RFC 5893` — Right-to-left Scripts: Bidirectional text handling for domain names.
--   `RFC 3492` — Punycode (ACE / punycode algorithm).
--   `UTS #46` — Unicode IDNA Compatibility Processing (mappings / deviations / transitional handling).
+- all 102 package tests;
+- all 6,077 applicable nontransitional `IdnaTestV2.txt` vectors.
 
-:::info
+## Versioning
 
-Links are intentionally not embedded here — use the RFC/UTS numbers to fetch authoritative copies on ietf.org and unicode.org.
+The deployed package metadata currently reports version `15.1.10`, and the bundled table targets Unicode 15.1.0. Consumers should inspect release notes rather than assuming that every future package version will encode its Unicode table version in a particular semantic-version component.
 
-:::
+## Authoritative references
+
+- [RFC 1035 — Domain Names: Implementation and Specification](https://www.rfc-editor.org/rfc/rfc1035)
+- [RFC 3492 — Punycode](https://www.rfc-editor.org/rfc/rfc3492)
+- [RFC 5890 — IDNA Definitions and Document Framework](https://www.rfc-editor.org/rfc/rfc5890)
+- [RFC 5891 — IDNA2008 Protocol](https://www.rfc-editor.org/rfc/rfc5891)
+- [RFC 5892 — Unicode Code Points and IDNA](https://www.rfc-editor.org/rfc/rfc5892)
+- [RFC 5893 — Right-to-Left Scripts for IDNA](https://www.rfc-editor.org/rfc/rfc5893)
+- [Unicode UTS #46 — Unicode IDNA Compatibility Processing](https://www.unicode.org/reports/tr46/)
+- [Unicode 15.1 IDNA data](https://www.unicode.org/Public/idna/15.1.0/)
 
 ## Disclaimer
 
-Some hostnames above are language or script-specific examples — they are provided to exercise the mapping/context rules, not to endorse any particular registration practice. Also, there should be no expectation that results validated by this validator will be automatically accepted by registrants, they may apply their own additional rules on top of those defined by IDNA.
+The examples exercise mapping and validation rules; they are not registration recommendations. Registries and registrars may impose additional script, language, repertoire, confusability, or policy restrictions.

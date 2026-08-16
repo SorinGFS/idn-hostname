@@ -1,29 +1,15 @@
 'use strict';
 // IDNA2008 validator using idnaMappingTableCompact.json
 const punycode = require('punycode/');
-const { props, viramas, ranges, mappings, bidi_ranges, joining_type_ranges } = require('./idnaMappingTableCompact.json');
+const { props, viramas, ranges, uts46_ranges, mappings, bidi_ranges, joining_type_ranges } = require('./idnaMappingTableCompact.json');
 // --- Error classes (short messages; RFC refs included in message) ---
-const throwIdnaContextJError = (msg) => {
-    throw Object.assign(new SyntaxError(msg), { name: 'IdnaContextJError' });
-};
-const throwIdnaContextOError = (msg) => {
-    throw Object.assign(new SyntaxError(msg), { name: 'IdnaContextOError' });
-};
-const throwIdnaUnicodeError = (msg) => {
-    throw Object.assign(new SyntaxError(msg), { name: 'IdnaUnicodeError' });
-};
-const throwIdnaLengthError = (msg) => {
-    throw Object.assign(new SyntaxError(msg), { name: 'IdnaLengthError' });
-};
-const throwIdnaSyntaxError = (msg) => {
-    throw Object.assign(new SyntaxError(msg), { name: 'IdnaSyntaxError' });
-};
-const throwPunycodeError = (msg) => {
-    throw Object.assign(new SyntaxError(msg), { name: 'PunycodeError' });
-};
-const throwIdnaBidiError = (msg) => {
-    throw Object.assign(new SyntaxError(msg), { name: 'IdnaBidiError' });
-};
+const throwIdnaContextJError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: 'IdnaContextJError' }) };
+const throwIdnaContextOError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: 'IdnaContextOError' }) };
+const throwIdnaUnicodeError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: 'IdnaUnicodeError' }) };
+const throwIdnaLengthError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: 'IdnaLengthError' }) };
+const throwIdnaSyntaxError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: 'IdnaSyntaxError' }) };
+const throwPunycodeError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: 'PunycodeError' }) };
+const throwIdnaBidiError = (msg) => { throw Object.assign(new SyntaxError(msg), { name: 'IdnaBidiError' }) };
 // --- constants ---
 const ZWNJ = 0x200c;
 const ZWJ = 0x200d;
@@ -48,12 +34,13 @@ function getRange(range, key) {
     }
     return null;
 }
-// mapping label (disallowed chars were removed from ranges, so undefined means disallowed or unassigned)
+// mapping label (UTS #46 overrides take precedence over final/default ranges)
 function uts46map(label) {
     const mappedCps = [];
     for (let i = 0; i < label.length; ) {
         const cp = label.codePointAt(i);
-        const prop = props[getRange(ranges, cp)];
+        // Use an override only when preprocessing differs from final/default classification.
+        const prop = props[getRange(uts46_ranges, cp) ?? getRange(ranges, cp)];
         const maps = mappings[String(cp)];
         // mapping cases
         if (prop === 'mapped' && Array.isArray(maps) && maps.length) {
@@ -97,21 +84,24 @@ function isIdnHostname(hostname) {
     // checks per label (IDNA is defined for labels, not for parts of them and not for complete domain names. RFC 5890 §2.3.2.1)
     let aceHostnameLength = 0;
     for (const rawLabel of rawLabels) {
+        // preserve the original raw A-label syntax error before compatibility mapping
+        if (/^xn--/i.test(rawLabel) && /[^\p{ASCII}]/u.test(rawLabel)) throwIdnaSyntaxError(`A-label '${rawLabel}' cannot contain non-ASCII character(s) (RFC 5890 §2.3.2.1).`);
+        // mapping phase (before ACE recognition because mapping can normalize or create the prefix)
+        let label = uts46map(rawLabel).normalize('NFC');
         // ACE label (xn--) validation: decode and re-encode must match
-        let label = rawLabel;
-        if (/^xn--/i.test(rawLabel)) {
-            if (/[^\p{ASCII}]/u.test(rawLabel)) throwIdnaSyntaxError(`A-label '${rawLabel}' cannot contain non-ASCII character(s) (RFC 5890 §2.3.2.1).`);
-            const aceBody = rawLabel.slice(4);
+        if (/^xn--/i.test(label)) {
+            if (/[^\p{ASCII}]/u.test(label)) throwIdnaSyntaxError(`A-label '${rawLabel}' cannot contain non-ASCII character(s) (RFC 5890 §2.3.2.1).`);
+            const aceBody = label.slice(4);
             try {
                 label = punycode.decode(aceBody);
             } catch (e) {
                 throwPunycodeError(`Invalid ASCII Compatible Encoding (ACE) of label '${rawLabel}' (RFC 5891 §4.4 → RFC 3492).`);
             }
             if (!/[^\p{ASCII}]/u.test(label)) throwIdnaSyntaxError(`decoded A-label '${rawLabel}' result U-label '${label}' cannot be empty or all-ASCII character(s) (RFC 5890 §2.3.2.1).`);
+            // Punycode output is validated as-is rather than normalized again.
+            if (label.normalize('NFC') !== label) throwIdnaSyntaxError(`decoded A-label '${rawLabel}' result U-label '${label}' must be in Normalization Form C (UTS #46 §4.1 V1).`);
             if (punycode.encode(label) !== aceBody) throwPunycodeError(`Re-encode mismatch for ASCII Compatible Encoding (ACE) label '${rawLabel}' (RFC 5891 §4.4 → RFC 3492).`);
         }
-        // mapping phase (here because decoded A-label may contain disallowed chars)
-        label = uts46map(label).normalize('NFC');
         // final ACE label lenght accounting
         let aceLabel;
         try {
@@ -134,10 +124,13 @@ function isIdnHostname(hostname) {
         // per-codepoint contextual checks
         for (let j = 0; j < cps.length; j++) {
             const cp = cps[j];
+            // check final IDNA2008 eligibility after mapping/NFC or unmodified ACE decoding
+            const idnaProp = props[getRange(ranges, cp)];
+            if (idnaProp !== 'valid' && idnaProp !== 'deviation') throwIdnaUnicodeError(`${cpHex(cp)} is disallowed in hostname (RFC 5892, UTS #46).`);
             // check ContextJ ZWNJ (uses joining types and virama rule)
             if (cps.includes(ZWNJ)) {
-                joinTypes += VIRAMAS.has(cp) ? 'V' : cp === ZWNJ ? 'Z' : getRange(joining_type_ranges, cp) || 'U';
-                if (j === cps.length - 1 && /(?![LD][T]*)(?<!V)Z(?![T]*[RD])/.test(joinTypes)) throwIdnaContextJError(`char ${JSON.stringify('U+200C')} (ZWNJ) has invalid join context: '${joinTypes}' (RFC 5892 Appendix A.1).`);
+                joinTypes += cp === ZWNJ && VIRAMAS.has(cps[j - 1]) ? 'U' : cp === ZWNJ ? 'Z' : getRange(joining_type_ranges, cp) || 'U';
+                if (j === cps.length - 1 && /(?:^|[^LDT])T*Z|ZT*(?:$|[^RDT])/.test(joinTypes)) throwIdnaContextJError(`char ${JSON.stringify('U+200C')} (ZWNJ) has invalid join context: '${joinTypes}' (RFC 5892 Appendix A.1).`);
             }
             // check ContextJ ZWJ (must be preceded by virama)
             if (cp === ZWJ) {
