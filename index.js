@@ -142,9 +142,9 @@ function isIdnHostname(hostname) {
             if (cp === MIDDLE_DOT) {
                 if (j === 0 || j === cps.length - 1 || !(cps[j - 1] === 0x6c && cps[j + 1] === 0x6c)) throwIdnaContextOError(`${cpHex(cp)} must be between two ASCII 'l' characters (RFC 5892 A.3).`);
             }
-            // check ContextO GREEK_KERAIA, must be followed by a Greek character (next non-spacing mark)
+            // Check GREEK_KERAIA against the immediately following character's Script property.
             if (cp === GREEK_KERAIA) {
-                if (!/^\p{Mn}*\p{sc=Greek}$/u.test(String.fromCodePoint(...cps.slice(j + 1)))) throwIdnaContextOError(`${cpHex(cp)} must be followed by Greek script (RFC 5892 A.4).`);
+                if (j === cps.length - 1 || !/^\p{sc=Greek}$/u.test(String.fromCodePoint(cps[j + 1]))) throwIdnaContextOError(`${cpHex(cp)} must be followed by Greek script (RFC 5892 A.4).`);
             }
             //  check ContextO HEBREW_GERESH and HEBREW_GERSHAYIM
             if (cp === HEBREW_GERESH || cp === HEBREW_GERSHAYIM) {

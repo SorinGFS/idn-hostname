@@ -9,11 +9,11 @@ description: "A validator for Internationalized Domain Names (IDNA2008) with non
 
 `idn-hostname` validates internationalized hostnames and converts valid input to ASCII Compatible Encoding (ACE). It combines:
 
-- nontransitional [Unicode UTS #46](https://www.unicode.org/reports/tr46/) preprocessing;
+- nontransitional [Unicode 15.1 UTS #46](https://www.unicode.org/reports/tr46/tr46-31.html) preprocessing;
 - IDNA2008 label validation from [RFC 5890](https://www.rfc-editor.org/rfc/rfc5890), [RFC 5891](https://www.rfc-editor.org/rfc/rfc5891), [RFC 5892](https://www.rfc-editor.org/rfc/rfc5892), and [RFC 5893](https://www.rfc-editor.org/rfc/rfc5893);
 - Punycode encoding and decoding from [RFC 3492](https://www.rfc-editor.org/rfc/rfc3492).
 
-The bundled immutable table targets Unicode 15.1.0. The package is CommonJS and depends on [`punycode`](https://www.npmjs.com/package/punycode). Browser use requires a bundler or runtime that supports those modules; the package does not declare a browser compatibility guarantee.
+The bundled table targets Unicode 15.1.0. The package is CommonJS and depends on [`punycode`](https://www.npmjs.com/package/punycode). Browser use requires a bundler or runtime that supports those modules; the package does not declare a browser compatibility guarantee.
 
 ## Install
 
@@ -204,7 +204,7 @@ Missing final/default ranges are treated as disallowed or unassigned. Deviation 
 
 ## Errors
 
-The API stops at the first fatal violation. Every exported operation may throw a `SyntaxError` object with one of these names:
+The API stops at the first fatal violation. Each validator function (`isIdnHostname`, `idnHostname`, and `uts46map`) may throw a `SyntaxError` object with one of these names:
 
 <details>
 <summary><strong>Error names and responsibilities</strong></summary>
@@ -290,7 +290,7 @@ Some examples contain invisible format characters. Keep source encoding intact w
 
 The Unicode 15.1 deployment has been checked against:
 
-- all 102 package tests;
+- all 104 package tests;
 - all 6,077 applicable nontransitional `IdnaTestV2.txt` vectors.
 
 <details>
@@ -333,7 +333,7 @@ The `15.1.x` release line targets Unicode 15.1.0. It is the package's first Unic
 - [RFC 5891 — IDNA2008 Protocol](https://www.rfc-editor.org/rfc/rfc5891)
 - [RFC 5892 — Unicode Code Points and IDNA](https://www.rfc-editor.org/rfc/rfc5892)
 - [RFC 5893 — Right-to-Left Scripts for IDNA](https://www.rfc-editor.org/rfc/rfc5893)
-- [Unicode UTS #46 — Unicode IDNA Compatibility Processing](https://www.unicode.org/reports/tr46/)
+- [Unicode 15.1 UTS #46 — Unicode IDNA Compatibility Processing](https://www.unicode.org/reports/tr46/tr46-31.html)
 - [Unicode 15.1 IDNA data](https://www.unicode.org/Public/idna/15.1.0/)
 
 ## Disclaimer
