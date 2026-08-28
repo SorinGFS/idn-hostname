@@ -9,16 +9,16 @@ description: "A validator for Internationalized Domain Names (IDNA2008) with non
 
 `idn-hostname` validates internationalized hostnames and converts valid input to ASCII Compatible Encoding (ACE). It combines:
 
-- nontransitional [Unicode 15.1 UTS #46](https://www.unicode.org/reports/tr46/tr46-31.html) preprocessing;
+- nontransitional [Unicode 16.0 UTS #46](https://www.unicode.org/reports/tr46/tr46-33.html) preprocessing;
 - IDNA2008 label validation from [RFC 5890](https://www.rfc-editor.org/rfc/rfc5890), [RFC 5891](https://www.rfc-editor.org/rfc/rfc5891), [RFC 5892](https://www.rfc-editor.org/rfc/rfc5892), and [RFC 5893](https://www.rfc-editor.org/rfc/rfc5893);
 - Punycode encoding and decoding from [RFC 3492](https://www.rfc-editor.org/rfc/rfc3492).
 
-The bundled table targets Unicode 15.1.0. The package is CommonJS and depends on [`punycode`](https://www.npmjs.com/package/punycode). Browser use requires a bundler or runtime that supports those modules; the package does not declare a browser compatibility guarantee.
+The bundled table targets Unicode 16.0.0. The package is CommonJS and depends on [`punycode`](https://www.npmjs.com/package/punycode). Browser use requires a bundler or runtime that supports those modules; the package does not declare a browser compatibility guarantee.
 
 ## Install
 
 ```sh
-npm install idn-hostname@15.1
+npm install idn-hostname@16
 ```
 
 ## API
@@ -170,12 +170,12 @@ Reference: RFC 5893 §2.
 
 ## Unicode data
 
-The deployment JSON is generated directly from authoritative Unicode 15.1.0 text files:
+The deployment JSON is generated directly from authoritative Unicode 16.0.0 text files:
 
-- [`IdnaMappingTable.txt`](https://www.unicode.org/Public/idna/15.1.0/IdnaMappingTable.txt) — UTS #46 statuses, mappings, and IDNA-version markers;
-- [`DerivedCombiningClass.txt`](https://www.unicode.org/Public/15.1.0/ucd/extracted/DerivedCombiningClass.txt) — canonical combining class 9 entries used as viramas;
-- [`DerivedJoiningType.txt`](https://www.unicode.org/Public/15.1.0/ucd/extracted/DerivedJoiningType.txt) — joining types used by the ZWNJ contextual rule;
-- [`DerivedBidiClass.txt`](https://www.unicode.org/Public/15.1.0/ucd/extracted/DerivedBidiClass.txt) — bidi classes used by RFC 5893 checks.
+- [`IdnaMappingTable.txt`](https://www.unicode.org/Public/idna/16.0.0/IdnaMappingTable.txt) — UTS #46 statuses, mappings, and IDNA-version markers;
+- [`DerivedCombiningClass.txt`](https://www.unicode.org/Public/16.0.0/ucd/extracted/DerivedCombiningClass.txt) — canonical combining class 9 entries used as viramas;
+- [`DerivedJoiningType.txt`](https://www.unicode.org/Public/16.0.0/ucd/extracted/DerivedJoiningType.txt) — joining types used by the ZWNJ contextual rule;
+- [`DerivedBidiClass.txt`](https://www.unicode.org/Public/16.0.0/ucd/extracted/DerivedBidiClass.txt) — bidi classes used by RFC 5893 checks.
 
 `IdnaMappingTable.txt` is a UTS #46 data file, not the RFC 5892 derived-property table. The generator uses its `NV8` and `XV8` markers to keep preprocessing permission separate from final IDNA2008 eligibility.
 
@@ -186,15 +186,15 @@ The validator ships one table and does not select a Unicode version at runtime.
 
 `idnaMappingTableCompact.json` contains:
 
-| Member | Purpose | Unicode 15.1 count |
+| Member | Purpose | Unicode 16.0 count |
 | --- | --- | ---: |
 | `props` | Property names: `valid`, `mapped`, `deviation`, `ignored`, `disallowed` | 5 |
-| `ranges` | Final/default property ranges | 2,034 |
-| `uts46_ranges` | Preprocessing overrides used only when UTS #46 differs from `ranges` | 452 |
-| `mappings` | Non-empty preprocessing mappings keyed by source code point | 6,239 |
-| `viramas` | Code points with canonical combining class 9 | 65 |
-| `bidi_ranges` | Explicit bidi-class ranges | 1,530 |
-| `joining_type_ranges` | Explicit joining-type ranges | 506 |
+| `ranges` | Final/default property ranges | 2,065 |
+| `uts46_ranges` | Preprocessing overrides used only when UTS #46 differs from `ranges` | 461 |
+| `mappings` | Non-empty preprocessing mappings keyed by source code point | 6,348 |
+| `viramas` | Code points with canonical combining class 9 | 69 |
+| `bidi_ranges` | Explicit bidi-class ranges | 1,587 |
+| `joining_type_ranges` | Explicit joining-type ranges | 519 |
 
 During preprocessing, `uts46_ranges` takes precedence and lookup falls back to `ranges`. After mapping and NFC—or after unmodified ACE decoding—final validation consults only `ranges` and accepts `valid` or `deviation`.
 
@@ -288,10 +288,10 @@ Some examples contain invisible format characters. Keep source encoding intact w
 
 ## Tests
 
-The Unicode 15.1 deployment has been checked against:
+The Unicode 16.0 deployment has been checked against:
 
-- all 104 package tests;
-- all 6,077 applicable nontransitional `IdnaTestV2.txt` vectors.
+- all 111 package tests;
+- all 6,188 applicable nontransitional `IdnaTestV2.txt` vectors.
 
 <details>
 <summary><strong>Tests</strong></summary>
@@ -323,7 +323,9 @@ Each release ships one Unicode data table and does not select a table at runtime
 
 When a release changes the targeted Unicode version, its documentation describes compatibility with the preceding release line and identifies any known cases in which input accepted by that preceding release becomes invalid.
 
-The `15.1.x` release line targets Unicode 15.1.0. It is the package's first Unicode-versioned release line, so there is no preceding release line to compare.
+The `16.0.x` release line targets Unicode 16.0.0 and follows the `15.1.x` release line, which targets Unicode 15.1.0. Unicode 16.0 expands the accepted repertoire, but it also corrects the properties of U+1171E AHOM CONSONANT SIGN MEDIAL RA from `Bidi_Class=NSM` and `Joining_Type=T` to `Bidi_Class=L` and `Joining_Type=U`. Labels whose validity depends on the earlier properties can therefore become invalid under RFC 5893 bidi or RFC 5892 CONTEXTJ validation.
+
+For example, `"\u0627\u{1171E}"` is valid in the 15.1 release line but violates the RTL-label bidi rules in the 16.0 release line. Similarly, `"\u0628\u{1171E}\u200C\u0628"` has valid ZWNJ joining context under Unicode 15.1 but invalid joining context under Unicode 16.0.
 
 ## Authoritative references
 
@@ -333,8 +335,8 @@ The `15.1.x` release line targets Unicode 15.1.0. It is the package's first Unic
 - [RFC 5891 — IDNA2008 Protocol](https://www.rfc-editor.org/rfc/rfc5891)
 - [RFC 5892 — Unicode Code Points and IDNA](https://www.rfc-editor.org/rfc/rfc5892)
 - [RFC 5893 — Right-to-Left Scripts for IDNA](https://www.rfc-editor.org/rfc/rfc5893)
-- [Unicode 15.1 UTS #46 — Unicode IDNA Compatibility Processing](https://www.unicode.org/reports/tr46/tr46-31.html)
-- [Unicode 15.1 IDNA data](https://www.unicode.org/Public/idna/15.1.0/)
+- [Unicode 16.0 UTS #46 — Unicode IDNA Compatibility Processing](https://www.unicode.org/reports/tr46/tr46-33.html)
+- [Unicode 16.0 IDNA data](https://www.unicode.org/Public/idna/16.0.0/)
 
 ## Disclaimer
 
