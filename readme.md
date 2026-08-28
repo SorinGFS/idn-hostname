@@ -18,7 +18,7 @@ The bundled immutable table targets Unicode 15.1.0. The package is CommonJS and 
 ## Install
 
 ```sh
-npm install idn-hostname
+npm install idn-hostname@15.1
 ```
 
 ## API
