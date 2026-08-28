@@ -317,7 +317,13 @@ The tests are materialized as ordinary local files under `#/public/tests/` and r
 
 ## Versioning
 
-The deployed package metadata currently reports version `15.1.10`, and the bundled table targets Unicode 15.1.0. Consumers should inspect release notes rather than assuming that every future package version will encode its Unicode table version in a particular semantic-version component.
+The package version identifies the Unicode version targeted by its bundled data. The major and minor package-version components correspond to the Unicode major and minor version, while the patch component identifies package fixes and revisions that retain the same Unicode target.
+
+Each release ships one Unicode data table and does not select a table at runtime. Runtime compatibility and selection of an appropriate package release are the consumer's responsibility.
+
+When a release changes the targeted Unicode version, its documentation describes compatibility with the preceding release line and identifies any known cases in which input accepted by that preceding release becomes invalid.
+
+The `15.1.x` release line targets Unicode 15.1.0. It is the package's first Unicode-versioned release line, so there is no preceding release line to compare.
 
 ## Authoritative references
 
