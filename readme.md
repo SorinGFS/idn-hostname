@@ -80,7 +80,14 @@ console.log(punycode.toUnicode('xn--maana-pta')); // mañana
 
 ## Processing model
 
-The validator deliberately separates compatibility preprocessing from final eligibility:
+The validator uses a narrow ASCII fast path and otherwise deliberately separates compatibility preprocessing from final eligibility. Before entering the Unicode pipeline, `isIdnHostname` directly accepts a non-reserved ASCII LDH hostname when:
+
+- every label contains only ASCII letters, digits, and internal hyphens;
+- every label contains 1–63 characters;
+- no label contains `--` in the third and fourth positions;
+- the complete presentation form contains at most 253 characters.
+
+Reserved labels, including labels beginning with `xn--`, continue through the complete IDNA validation pipeline. `idnHostname` still applies UTS #46 mapping when producing its result, so uppercase ASCII input is returned in lowercase. Inputs that do not meet the fast-path constraints follow these steps:
 
 1. Split the hostname at UTS #46 label separators and reject empty labels, including a trailing root label.
 2. Apply nontransitional UTS #46 mappings with STD3 rules disabled.
@@ -98,25 +105,26 @@ This order permits sequences such as Hangul Jamo to compose into an eligible syl
 For each hostname, the implementation:
 
 1. Requires a JavaScript string.
-2. Splits labels on U+002E, U+FF0E, U+3002, and U+FF61.
-3. Rejects leading, trailing, or consecutive separators because they create an empty label.
-4. Determines whether the hostname requires RFC 5893 bidi enforcement.
-5. Preserves the existing raw non-ASCII A-label syntax check before preprocessing.
-6. Applies `uts46map` and NFC to ordinary input.
-7. If the preprocessed label starts with `xn--`:
+2. Accepts a hostname satisfying the non-reserved ASCII LDH fast-path constraints without Unicode table, contextual, Punycode, or bidi validation.
+3. For remaining input, splits labels on U+002E, U+FF0E, U+3002, and U+FF61.
+4. Rejects leading, trailing, or consecutive separators because they create an empty label.
+5. Determines whether the hostname requires RFC 5893 bidi enforcement.
+6. Preserves the existing raw non-ASCII A-label syntax check before preprocessing.
+7. Applies `uts46map` and NFC to ordinary input.
+8. If the preprocessed label starts with `xn--`:
    - requires ASCII input;
    - decodes the Punycode payload;
    - rejects an empty or all-ASCII decoded U-label;
    - requires the decoded U-label to already be NFC;
    - requires exact decode/re-encode agreement after preprocessing has normalized the ACE label's case.
-8. Converts the resulting label to ASCII for length accounting and requires at most 63 ASCII octets.
-9. Rejects a leading or trailing hyphen and hyphens in positions 3 and 4 of a U-label.
-10. Rejects a leading Unicode mark.
-11. Spreads the label into code points once and uses the existing per-code-point loop to:
+9. Converts the resulting label to ASCII for length accounting and requires at most 63 ASCII octets.
+10. Rejects a leading or trailing hyphen and hyphens in positions 3 and 4 of a U-label.
+11. Rejects a leading Unicode mark.
+12. Spreads the label into code points once and uses the existing per-code-point loop to:
     - require final `valid` or nontransitional `deviation` eligibility;
     - enforce CONTEXTJ and CONTEXTO rules;
     - enforce RFC 5893 bidi rules when the hostname is bidi.
-12. Requires the complete ASCII presentation form, without a trailing root dot, to contain at most 253 octets.
+13. Requires the complete ASCII presentation form, without a trailing root dot, to contain at most 253 octets.
 
 The 63-octet label limit and 255-octet DNS wire-format limit come from the DNS size limits described by RFC 1035 and RFC 5890. The implementation's 253-character presentation-form limit accounts for separators while intentionally disallowing a trailing root dot.
 
@@ -290,7 +298,7 @@ Some examples contain invisible format characters. Keep source encoding intact w
 
 The Unicode 16.0 deployment has been checked against:
 
-- all 111 package tests;
+- all 115 package tests;
 - all 6,188 applicable nontransitional `IdnaTestV2.txt` vectors.
 
 <details>
