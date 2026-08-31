@@ -15,6 +15,8 @@ description: "A validator for Internationalized Domain Names (IDNA2008) with non
 
 The bundled table targets Unicode 17.0.0. The package is CommonJS and depends on [`punycode`](https://www.npmjs.com/package/punycode). Browser use requires a bundler or runtime that supports those modules; the package does not declare a browser compatibility guarantee.
 
+The supported Node.js range is `>=24.13.1 <25 || >=26.0.0`. [Node.js 24.13.1](https://nodejs.org/en/blog/release/v24.13.1) is the first LTS release in the 24.x line to bundle ICU 78.2; [ICU 78](https://unicode-org.github.io/icu/download/78.html) updates Unicode properties, normalization data, and IDNA data to Unicode 17. Node.js 24.13.0 and earlier use ICU 77.1, and Node.js 25 also uses ICU 77.1, so those runtimes cannot provide the Unicode 17 behavior required by this release. Node.js 26 starts with ICU 78.3 and is compatible. The package bundles its own UTS #46 table, but its normalization and Unicode-property checks still require matching runtime Unicode data.
+
 ## Install
 
 ```sh
@@ -294,17 +296,12 @@ Some examples contain invisible format characters. Keep source encoding intact w
 
 </details>
 
-## Tests
+## Verification
 
-The Unicode 17.0 deployment has been checked against:
-
-- all 122 package tests;
-- all 6,190 applicable nontransitional `IdnaTestV2.txt` vectors.
+Tests and benchmarks are maintained in [SorinGFS/public-data](https://github.com/SorinGFS/public-data) rather than in the package or canonical repository. The [gh-workspace-data](https://github.com/SorinGFS/gh-workspace-data) extension materializes those concerns together with the shared `#/version-layers.js` runtime required by both dispatchers.
 
 <details>
-<summary><strong>Tests</strong></summary>
-
-The package test fixtures are maintained separately as public workspace data, so they are not included in the package or canonical repository. Users and contributors who need them can materialize them into a cloned repository with [gh-workspace-data](https://github.com/SorinGFS/gh-workspace-data).
+<summary><strong>gh-workspace-data usage</strong></summary>
 
 Install the GitHub CLI extension once:
 
@@ -312,14 +309,69 @@ Install the GitHub CLI extension once:
 gh extension install SorinGFS/gh-workspace-data
 ```
 
-Then run the workspace-data commands from the repository:
+Initialize and load workspace data from the cloned project repository:
 
 ```sh
 gh workspace-data init
 gh workspace-data load
 ```
 
-The tests are materialized as ordinary local files under `#/public/tests/` and remain excluded from the canonical Git repository.
+The extension materializes ordinary local files under `#/public/tests/` and `#/public/benchmarks/`, while `#/version-layers.js` provides deterministic version-layer discovery. The generated `#/` namespace remains excluded from the canonical Git repository and npm package.
+
+Run `gh workspace-data load` again to refresh materialized data after public-data changes or an extension upgrade.
+
+</details>
+
+### Tests
+
+Package fixtures remain in delta-only Unicode scopes: `v15.1` contains 108 cases, `v16.0` contains seven additions, and `v17.0` contains seven additions. Because `#/public/tests/index.json` marks the validation callback as backwards compatible, the dispatcher runs numeric fixtures from every version layer not newer than the installed package while keeping explicit conformance concerns exact-scoped. For the current 17.0 release line, the active suite contains 6,324 independently reported tests: all 122 eligible package fixtures and all 6,202 applicable nontransitional Unicode 17.0.0 `IdnaTestV2.txt` vectors.
+
+<details>
+<summary><strong>Test details</strong></summary>
+
+Install package dependencies and run the materialized suite:
+
+```sh
+npm install
+npm test
+```
+
+The suite uses the `node:test` module built into Node.js and requires no separate test-runner dependency. Its deterministic dispatcher processes eligible version layers, numbered JSON fixtures, and explicit nonnumeric suite entry points in defined order. `#/public/tests/index.json` selects the package's `isIdnHostname` callback and declares it backwards compatible, so numeric package fixtures accumulate semantically without being copied between version folders. Explicit concern suites retain exact-scope selection, and the matching Unicode conformance concern receives the complete package API from the root dispatcher.
+
+Each applicable `IdnaTestV2.txt` vector exercises both `isIdnHostname` and `idnHostname`; valid conversions must equal the expected nontransitional ToASCII result. Applicability excludes otherwise-valid `NV8`/`XV8` inputs permitted by default UTS #46 but rejected by this package's IDNA2008 policy and valid trailing-root inputs rejected by the package's presentation policy. `U1` statuses are ignored because preprocessing uses `UseSTD3ASCIIRules=false`. CONTEXTO classification remains covered by the version-specific package fixtures rather than by the Unicode concern's applicability logic.
+
+The Unicode fixture registrar verifies that the runtime's Unicode data is at least version 17.0 before registering vectors. The materialized `#/public/tests/README.md` documents the portable layout, and `#/public/tests/v17.0/idna-test-v2/README.md` documents source provenance and applicability rules.
+
+`npm test` exits unsuccessfully when configuration, fixture loading, suite registration, conversion output, or a test fails. Continuous integration is configured to run the suite on the exact minimum Node.js 24.13.1 LTS runtime and the current compatible Node.js 26 release across Ubuntu, Windows, and macOS.
+
+</details>
+
+### Benchmarks
+
+The materialized benchmark suite provides portable, version-aware measurements for package loading and the three package-owned function exports, including separate ASCII and internationalized inputs for both `isIdnHostname` and `idnHostname`.
+
+<details>
+<summary><strong>Benchmark details</strong></summary>
+
+Run the standard workload:
+
+```sh
+npm run benchmark
+```
+
+Run a reduced workload with machine-readable output for CI smoke checks or artifacts:
+
+```sh
+node ./#/public/benchmarks --quick --json
+```
+
+Direct invocation also supports an explicit iteration count; `npm run benchmark` retains the standard 100,000 iterations per sample:
+
+```sh
+node ./#/public/benchmarks --iterations 250000
+```
+
+The harness records five initial calls, warmed minimum/median/p95/maximum latency in milliseconds with six decimal places, integer operations per second, representative arguments, workload counts, and environment metadata. Its generic coordinator supports the same optional `backwardsCompatible` version-layer selection through `#/public/benchmarks/index.json` when versioned benchmark concerns are introduced. The materialized `#/public/benchmarks/README.md` documents concern registration, version eligibility, workload controls, output fields, and guidance for noisy CI runners. Benchmark values are observations rather than correctness assertions.
 
 </details>
 

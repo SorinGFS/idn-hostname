@@ -1,6 +1,6 @@
 {
   "name": "idn-hostname",
-  "version": "17.0.1",
+  "version": "17.0.2",
   "description": "An internationalized hostname validator as defined by RFC5890, RFC5891, RFC5892, RFC5893, RFC3492 and UTS#46",
   "keywords": [
     "idn-hostname",
@@ -22,8 +22,13 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node ./#/public/tests",
+    "benchmark": "node ./#/public/benchmarks"
   },
+  "engines": {
+    "node": ">=24.13.1 <25 || >=26.0.0"
+  },
+  "engineStrict": true,
   "dependencies": {
     "punycode": "^2.3.1"
   },
