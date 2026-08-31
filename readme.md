@@ -336,7 +336,7 @@ npm install
 npm test
 ```
 
-The suite uses the `node:test` module built into Node.js and requires no separate test-runner dependency. Its deterministic dispatcher processes eligible version layers, numbered JSON fixtures, and explicit nonnumeric suite entry points in defined order. `#/public/tests/index.json` selects the package's `isIdnHostname` callback and declares it backwards compatible, so numeric package fixtures accumulate semantically without being copied between version folders. Explicit concern suites retain exact-scope selection, and the matching Unicode conformance concern receives the complete package API from the root dispatcher.
+The suite uses the `node:test` module built into Node.js and requires no separate test-runner dependency. Its deterministic dispatcher delegates exact/cumulative layer selection, numbered-fixture traversal, and explicit concern discovery to the `gh-workspace-data v0.5.0` runtime. `#/public/tests/index.json` selects the package's `isIdnHostname` callback and declares it backwards compatible, so numeric package fixtures accumulate semantically without being copied between version folders. Explicit concern suites retain exact-scope selection, and the matching Unicode conformance concern receives the complete package API from the root dispatcher.
 
 Each applicable `IdnaTestV2.txt` vector exercises both `isIdnHostname` and `idnHostname`; valid conversions must equal the expected nontransitional ToASCII result. Applicability excludes otherwise-valid `NV8`/`XV8` inputs permitted by default UTS #46 but rejected by this package's IDNA2008 policy and valid trailing-root inputs rejected by the package's presentation policy. `U1` statuses are ignored because preprocessing uses `UseSTD3ASCIIRules=false`. CONTEXTO classification remains covered by the version-specific package fixtures rather than by the Unicode concern's applicability logic.
 
@@ -371,7 +371,7 @@ Direct invocation also supports an explicit iteration count; `npm run benchmark`
 node ./#/public/benchmarks --iterations 250000
 ```
 
-The harness records five initial calls, warmed minimum/median/p95/maximum latency in milliseconds with six decimal places, integer operations per second, representative arguments, workload counts, and environment metadata. Its generic coordinator supports the same optional `backwardsCompatible` version-layer selection through `#/public/benchmarks/index.json` when versioned benchmark concerns are introduced. The materialized `#/public/benchmarks/README.md` documents concern registration, version eligibility, workload controls, output fields, and guidance for noisy CI runners. Benchmark values are observations rather than correctness assertions.
+The harness records five initial calls, warmed minimum/median/p95/maximum latency in milliseconds with six decimal places, integer operations per second, representative arguments, workload counts, and environment metadata. Its generic coordinator delegates exact or cumulative layer selection and ordered concern discovery to the `gh-workspace-data v0.5.0` runtime. The materialized `#/public/benchmarks/README.md` documents concern registration, version eligibility, workload controls, output fields, and guidance for noisy CI runners. Benchmark values are observations rather than correctness assertions.
 
 </details>
 
