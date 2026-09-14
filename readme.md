@@ -82,7 +82,7 @@ console.log(punycode.toUnicode('xn--maana-pta')); // mañana
 
 ## Processing model
 
-The validator uses a narrow ASCII fast path and otherwise deliberately separates compatibility preprocessing from final eligibility. Before entering the Unicode pipeline, `isIdnHostname` directly accepts a non-reserved ASCII LDH hostname when:
+The validator uses a narrow ASCII fast path and otherwise deliberately separates compatibility preprocessing from final eligibility. Before entering the Unicode pipeline, `isIdnHostname` directly accepts a non-reserved ASCII LDH hostname with an optional terminal root dot when:
 
 - every label contains only ASCII letters, digits, and internal hyphens;
 - every label contains 1–63 characters;
@@ -91,7 +91,7 @@ The validator uses a narrow ASCII fast path and otherwise deliberately separates
 
 Reserved labels, including labels beginning with `xn--`, continue through the complete IDNA validation pipeline. `idnHostname` still applies UTS #46 mapping when producing its result, so uppercase ASCII input is returned in lowercase. Inputs that do not meet the fast-path constraints follow these steps:
 
-1. Split the hostname at UTS #46 label separators and reject empty labels, including a trailing root label.
+1. Split the hostname at UTS #46 label separators, retain one terminal separator as the DNS root marker, and reject other empty labels.
 2. Apply nontransitional UTS #46 mappings with STD3 rules disabled.
 3. Normalize ordinary Unicode input to NFC.
 4. Recognize and decode an ACE prefix after preprocessing, so case and compatibility mappings cannot hide or create an unchecked prefix.
@@ -109,7 +109,7 @@ For each hostname, the implementation:
 1. Requires a JavaScript string.
 2. Accepts a hostname satisfying the non-reserved ASCII LDH fast-path constraints without Unicode table, contextual, Punycode, or bidi validation.
 3. For remaining input, splits labels on U+002E, U+FF0E, U+3002, and U+FF61.
-4. Rejects leading, trailing, or consecutive separators because they create an empty label.
+4. Retains one terminal separator as the DNS root marker and rejects leading or consecutive separators.
 5. Determines whether the hostname requires RFC 5893 bidi enforcement.
 6. Preserves the existing raw non-ASCII A-label syntax check before preprocessing.
 7. Applies `uts46map` and NFC to ordinary input.
@@ -126,9 +126,9 @@ For each hostname, the implementation:
     - require final `valid` or nontransitional `deviation` eligibility;
     - enforce CONTEXTJ and CONTEXTO rules;
     - enforce RFC 5893 bidi rules when the hostname is bidi.
-13. Requires the complete ASCII presentation form, without a trailing root dot, to contain at most 253 octets.
+13. Requires the complete ASCII presentation form, excluding an optional trailing root dot, to contain at most 253 octets.
 
-The 63-octet label limit and 255-octet DNS wire-format limit come from the DNS size limits described by RFC 1035 and RFC 5890. The implementation's 253-character presentation-form limit accounts for separators while intentionally disallowing a trailing root dot.
+The 63-octet label limit and 255-octet DNS wire-format limit come from the DNS size limits described by RFC 1035 and RFC 5890. A dotted presentation without its optional root dot is two octets shorter than the equivalent DNS wire encoding: the wire form adds one length octet per label and the zero-length root label, while presentation dots already separate adjacent labels. Consequently, the RFC wire-format limit permits at most 253 octets in that presentation form. A terminal UTS #46 separator denotes the DNS root and is converted to U+002E in ACE output.
 
 </details>
 
@@ -237,7 +237,7 @@ Messages include the relevant RFC or UTS reference. Error precedence follows the
 
 - Processing is nontransitional; the deprecated transitional mappings are not offered.
 - STD3 ASCII rules are disabled during preprocessing. This does not make otherwise ineligible code points valid after NFC.
-- The validator rejects a trailing root dot instead of accepting an absolute/FQDN presentation form.
+- The validator accepts one terminal UTS #46 separator as the DNS root marker and converts it to U+002E in ACE output.
 - It evaluates every implemented CONTEXTO rule, including during lookup-style use.
 - It performs no locale-specific casing or registration-policy processing.
 - It does not query DNS, determine whether a name is registered, or apply registry-specific script, confusability, or security policies.
@@ -265,6 +265,8 @@ Messages include the relevant RFC or UTS reference. Error precedence follows the
     'क्‌ष',       // virama + ZWNJ
     'a⁠b',        // U+2060 is ignored during preprocessing
     '가',        // Hangul Jamo normalize to 가
+    'example.com.', // terminal U+002E denotes the DNS root
+    '例子。',       // terminal U+3002 maps to the U+002E root marker
 ]
 ```
 
@@ -277,8 +279,8 @@ Messages include the relevant RFC or UTS reference. Error precedence follows the
 [
     '',
     '.example',
-    'example.',       // trailing root labels are intentionally rejected
     'a..b',
+    'example.com..',  // only one terminal root separator is accepted
     '-abc',
     'abc-',
     'a b',
@@ -324,7 +326,7 @@ Run `gh workspace-data load` again to refresh materialized data after public-dat
 
 ### Tests
 
-Package fixtures remain in delta-only Unicode scopes. Because `#/public/tests/index.json` marks the validation callback as backwards compatible, the dispatcher runs every numeric version layer not newer than the installed package. For the 16.0 release line, the active suite contains 6,315 independently reported tests: 115 eligible package fixtures and all 6,200 applicable nontransitional Unicode 16.0.0 `IdnaTestV2.txt` vectors.
+Package fixtures remain in delta-only Unicode scopes. Because `#/public/tests/index.json` marks the validation callback as backwards compatible, the dispatcher runs every numeric version layer not newer than the installed package. For the 16.0 release line, the active suite contains 6,327 independently reported tests: 127 eligible package fixtures and all 6,200 applicable Unicode 16.0.0 `IdnaTestV2.txt` vectors.
 
 <details>
 <summary><strong>Test details</strong></summary>
@@ -338,7 +340,7 @@ npm test
 
 The suite uses the `node:test` module built into Node.js and requires no separate test-runner dependency. Its deterministic dispatcher delegates exact/cumulative layer selection, numbered-fixture traversal, and explicit concern discovery to the `gh-workspace-data v0.5.0` runtime. `#/public/tests/index.json` selects the package's `isIdnHostname` callback and declares it backwards compatible, so numeric package fixtures accumulate semantically without being copied between version folders. Explicit concern suites retain exact-scope selection, and the matching Unicode conformance concern receives the complete package API from the root dispatcher.
 
-Each applicable `IdnaTestV2.txt` vector exercises both `isIdnHostname` and `idnHostname`; valid conversions must equal the expected nontransitional ToASCII result. Applicability excludes otherwise-valid `NV8`/`XV8` inputs permitted by default UTS #46 but rejected by this package's IDNA2008 policy and valid trailing-root inputs rejected by the package's presentation policy. `U1` statuses are ignored because preprocessing uses `UseSTD3ASCIIRules=false`. CONTEXTO classification remains covered by the version-specific package fixtures rather than by the Unicode concern's applicability logic.
+Each applicable `IdnaTestV2.txt` vector exercises both `isIdnHostname` and `idnHostname`; valid conversions must equal the expected nontransitional ToASCII result. Applicability excludes otherwise-valid `NV8`/`XV8` inputs permitted by default UTS #46 but rejected by this package's IDNA2008 policy. Unicode assigns `A4_2` to an empty terminal label when ToASCII enables its DNS-length option; the concern instead evaluates that case as RFC 1034's root label and accepts it when the non-root labels and complete domain name satisfy the DNS size limits in RFC 1034 §3.1. `U1` statuses are omitted because preprocessing uses `UseSTD3ASCIIRules=false`. CONTEXTO classification remains covered by the version-specific package fixtures rather than by the Unicode concern's applicability logic.
 
 The Unicode fixture registrar verifies that the runtime's Unicode data is at least version 16.0 before registering vectors. The materialized `#/public/tests/README.md` documents the portable layout, and `#/public/tests/v16.0/idna-test-v2/README.md` documents source provenance and applicability rules.
 
