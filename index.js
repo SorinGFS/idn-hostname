@@ -65,11 +65,13 @@ function cpHex(cp) {
 function isIdnHostname(hostname) {
     // Reject non-string inputs before the fast path can coerce them.
     if (typeof hostname !== 'string') throwIdnaSyntaxError('Label must be a string (RFC 5890 §2.3.2.3).');
-    // Accept ordinary ASCII NR-LDH hostnames without invoking Unicode validation.
-    if (/^(?=.{1,253}(?![\s\S]))(?![A-Za-z0-9-]{2}--)(?![\s\S]*\.[A-Za-z0-9-]{2}--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*(?![\s\S])/.test(hostname)) return true;
-    // split hostname in labels by the separators defined in uts#46 §2.3
+    // Remove an optional ASCII presentation dot for the zero-length root label defined by RFC 1034 §3.1.
+    const hostnameWithoutAsciiRootDot = hostname.endsWith('.') ? hostname.slice(0, -1) : hostname;
+    if (hostnameWithoutAsciiRootDot.length <= 253 && /^(?![A-Za-z0-9-]{2}--)(?![\s\S]*\.[A-Za-z0-9-]{2}--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*(?![\s\S])/.test(hostnameWithoutAsciiRootDot)) return true;
+    // Split at the separators defined by UTS #46 §2.3, removing one terminal empty field that represents the DNS root.
     const rawLabels = hostname.split(/[\x2E\uFF0E\u3002\uFF61]/);
-    if (rawLabels.some((label) => label.length === 0)) throwIdnaLengthError('Label cannot be empty (consecutive or leading/trailing dot) (RFC 5890 §2.3.2.3).');
+    if (rawLabels.length > 1 && rawLabels.at(-1) === '') rawLabels.pop();
+    if (rawLabels.some((label) => label.length === 0)) throwIdnaLengthError('Label cannot be empty (leading or consecutive separator) (RFC 5890 §2.3.2.3).');
     let isBidiHostname = false;
     try {     
         for (const char of punycode.toUnicode(hostname)) {
